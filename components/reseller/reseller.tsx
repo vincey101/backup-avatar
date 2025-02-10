@@ -8,13 +8,27 @@ export default function Reseller() {
     const [value, setValue] = useState('1')
     
     return (
-        <div className="w-full max-w-[1400px] mx-auto font-sans p-8">
-            <div className="page-content">
-                <div className="container-fluid">
+        <div className="w-full max-w-[1400px] mx-auto font-sans">
+            <div className="container mx-auto px-4 py-8">
+                <h1 className="text-3xl font-bold text-gray-900 mb-8">
+                    CONGRATULATIONS, YOU HAVE GOT THE RESELLER LICENSE.
+                </h1>
+
+                {/* Add new video section */}
+                <div className="mb-8">
+                    <div className="aspect-video max-w-3xl mx-auto">
+                        <iframe
+                            className="w-full h-full rounded-lg shadow-lg"
+                            src="https://www.youtube.com/embed/JVtYqt2NQeE"
+                            title="Reseller License Tutorial"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                            allowFullScreen
+                        />
+                    </div>
+                </div>
+
+                <div className="space-y-8">
                     <div className="mb-8 mt-4">
-                        <h1 className="text-3xl font-bold text-gray-900 mb-4">
-                            CONGRATULATIONS, YOU HAVE GOT THE RESELLER LICENSE.
-                        </h1>
                         <h2 className="mt-4 text-xl text-gray-700">
                             Kindly Follow The Steps To Get Your Link.
                         </h2>
@@ -99,7 +113,7 @@ export default function Reseller() {
                                                 <p className="text-red-600 mb-4">
                                                     &gt;&gt; I purchased Ink AI Reseller Plan With This Email Address
                                                     <br />
-                                                    ("Specify Your Email"). Pls Approve My Request & Set To 90% to 80% Commission.
+                                                    ("Specify Your Email"). Pls Approve My Request & Set to 80% Commission.
                                                 </p>
                                                 <img
                                                     src="https://myaitalkie.com/img/users/reseller2-de618784.jpg"
@@ -132,7 +146,7 @@ export default function Reseller() {
                                                 </div>
 
                                                 <p>
-                                                    Viola! Start Selling Using Your Link & Bank  90% to 80% Commission Across All Funnels
+                                                    Viola! Start Selling Using Your Link & Bank 80% Commission Across All Funnels
                                                 </p>
 
                                                 <a

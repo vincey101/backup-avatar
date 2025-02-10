@@ -3,11 +3,7 @@
 import {
     Modal, 
     ModalContent,
-    ModalHeader,
-    ModalBody,
-    ModalFooter,
     Button,
-    useDisclosure
 } from "@nextui-org/react";
 import { TrashIcon } from '@heroicons/react/24/outline';
 
@@ -60,4 +56,4 @@ export default function DeleteUser({ dialog, setDialog, deleteUser, loading }: D
             </ModalContent>
         </Modal>
     );
-}
+} 

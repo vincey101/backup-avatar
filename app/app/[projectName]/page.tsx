@@ -25,7 +25,13 @@ import StreamingAvatar, {
 import { Mic, MessageSquareText, LogOut } from 'lucide-react';
 import InteractiveAvatarTextInput from '@/components/InteractiveAvatarTextInput';
 
-export default function Preview() {
+interface PageProps {
+  params: {
+    projectName: string;
+  }
+}
+
+export default function Preview({ params }: PageProps) {
     const router = useRouter();
     const [stream, setStream] = useState<MediaStream>();
     const [isLoadingStream, setIsLoadingStream] = useState(true);
@@ -42,12 +48,12 @@ export default function Preview() {
     const audioChunks = useRef<Blob[]>([]);
     const [isAvatarResponding, setIsAvatarResponding] = useState(false);
     const [showEndSessionModal, setShowEndSessionModal] = useState(false);
+    const [timeLeft, setTimeLeft] = useState<number>(0);
+    const timerRef = useRef<NodeJS.Timeout | null>(null);
 
     useEffect(() => {
         const fetchProjectData = async () => {
-            // Get project name from URL parameters
-            const params = new URLSearchParams(window.location.search);
-            const projectName = params.get('name');
+            const projectName = params.projectName;
 
             if (!projectName) {
                 toast.error('No project name found');
@@ -55,24 +61,13 @@ export default function Preview() {
             }
 
             try {
-                // Get the token from localStorage if available, otherwise proceed without it
-                const userDataStr = localStorage.getItem('userData');
-                const token = userDataStr ? JSON.parse(userDataStr).token : null;
-
-                // Fetch project data from API
-                const response = await fetch(`https://api.humanaiapp.com/api/get-ai-project?name=${encodeURIComponent(projectName)}`, {
-                    headers: {
-                        'Content-Type': 'application/json',
-                        ...(token && { 'Authorization': `Bearer ${token}` })
-                    },
-                });
+                const response = await fetch(`https://api.humanaiapp.com/api/get_avatar_name/${encodeURIComponent(projectName)}`);
 
                 if (!response.ok) {
                     throw new Error('Failed to fetch project data');
                 }
 
-                const data = await response.json();
-                const projectData = data.data.find((p: any) => p.project_name === projectName);
+                const { data: projectData } = await response.json();
 
                 if (!projectData) {
                     throw new Error('Project not found');
@@ -87,13 +82,33 @@ export default function Preview() {
         };
 
         fetchProjectData();
-    }, []);
+    }, [params.projectName]);
 
     useEffect(() => {
         if (stream && mediaStream.current) {
             mediaStream.current.srcObject = stream;
         }
     }, [stream]);
+
+    const getSessionDuration = () => {
+        try {
+            const userDataStr = localStorage.getItem('userData');
+            if (!userDataStr) return 2 * 60; // Default to 2 minutes
+
+            const userData = JSON.parse(userDataStr);
+            if (userData.user?.oto_1 === 1) return 5 * 60; // 5 minutes for OTO-1 users
+            if (userData.user?.fe === 1) return 2 * 60; // 2 minutes for FE users
+            return 2 * 60; // Default to 2 minutes
+        } catch (error) {
+            return 2 * 60; // Default to 2 minutes if any error
+        }
+    };
+
+    const formatTime = (seconds: number): string => {
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
+    };
 
     const initializePreview = async (projectData: any) => {
         try {
@@ -138,13 +153,27 @@ export default function Preview() {
                 disableIdleTimeout: true,
             });
 
+            // Start the timer after successful session start
+            const duration = getSessionDuration();
+            setTimeLeft(duration);
+
+            timerRef.current = setInterval(() => {
+                setTimeLeft((prev) => {
+                    if (prev <= 1) {
+                        if (timerRef.current) clearInterval(timerRef.current);
+                        window.close();
+                        return 0;
+                    }
+                    return prev - 1;
+                });
+            }, 1000);
+
             await avatar.current.startVoiceChat({
                 useSilencePrompt: false
             });
 
         } catch (error) {
             console.error("Error setting up preview:", error);
-            toast.error("Failed to load preview");
             setIsLoadingStream(false);
         }
     };
@@ -244,18 +273,33 @@ export default function Preview() {
         window.close();
     };
 
+    useEffect(() => {
+        return () => {
+            if (timerRef.current) {
+                clearInterval(timerRef.current);
+            }
+        };
+    }, []);
+
     return (
         <div className="min-h-screen bg-gray-100 p-4">
-            <Card className={`bg-white border border-gray-200 ${stream ? 'w-[98%] max-w-[2000px] min-w-[1400px] mx-auto fixed top-4 left-1/2 -translate-x-1/2 z-50' : ''
+            <Card className={`bg-white border border-gray-200 ${
+                stream ? 'w-[90%] max-w-[1200px] mx-auto mt-8' : ''
+            }`}>
+                <CardBody className={`flex flex-col items-center bg-white ${
+                    stream ? 'h-[70vh] min-h-[400px]' : 'h-[350px] justify-center'
                 }`}>
-                <CardBody className={`flex flex-col items-center bg-white ${stream ? 'h-[calc(100vh-300px)] min-h-[450px]' : 'h-[350px] justify-center'
-                    }`}>
                     {isLoadingStream ? (
                         <div className="absolute inset-0 flex items-center justify-center">
                             <Spinner size="lg" />
                         </div>
                     ) : stream ? (
                         <div className="h-full w-full justify-center items-center flex rounded-lg overflow-hidden relative">
+                            <div className="absolute top-3 right-3 bg-black/50 px-3 py-1 rounded-full">
+                                <span className="text-white font-mono">
+                                    {formatTime(timeLeft)}
+                                </span>
+                            </div>
                             <video
                                 ref={mediaStream}
                                 autoPlay
@@ -263,7 +307,7 @@ export default function Preview() {
                                 style={{
                                     width: "100%",
                                     height: "100%",
-                                    objectFit: "cover",
+                                    objectFit: "contain",
                                 }}
                             >
                                 <track kind="captions" />
@@ -290,7 +334,7 @@ export default function Preview() {
             </Card>
 
             {/* Chat and Voice Controls */}
-            <div className="fixed bottom-8 left-1/2 -translate-x-1/2 w-full max-w-[1400px] px-4">
+            <div className="fixed bottom-8 left-1/2 -translate-x-1/2 w-[90%] max-w-[1200px] px-4">
                 <Card className="bg-black/40 backdrop-blur-md border-t border-white/20">
                     <CardBody className="p-4">
                         <Tabs

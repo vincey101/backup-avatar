@@ -4,30 +4,28 @@ export async function POST(req: NextRequest) {
     try {
         const formData = await req.formData();
         const file = formData.get('file') as File;
-        const type = formData.get('type') as string; // 'pdf' or 'doc'
+        const type = formData.get('type') as string;
 
         if (!file) {
             return NextResponse.json({ error: 'No file uploaded' }, { status: 400 });
         }
 
-        // Get the authorization header from the request
         const authHeader = req.headers.get('authorization');
         if (!authHeader) {
             return NextResponse.json({ error: 'Authorization header missing' }, { status: 401 });
         }
 
-        // Create a new FormData instance for the external API
         const externalFormData = new FormData();
-        // Use 'pdf' as the field name for PDF files when sending to humanaiapp.com
-        const fieldName = type === 'pdf' ? 'pdf' : 'file';
-        externalFormData.append(fieldName, file);
+        if (type === 'pdf') {
+            externalFormData.append('pdf', file);
+        } else if (type === 'docx') {
+            externalFormData.append('docx', file);
+        }
 
-        // Choose the appropriate endpoint based on file type
         const endpoint = type === 'pdf'
             ? 'https://api.humanaiapp.com/api/get-pdf-content'
             : 'https://api.humanaiapp.com/api/get-docx-content';
 
-        // Make the request to the external API with the authorization header
         const response = await fetch(endpoint, {
             method: 'POST',
             headers: {
@@ -35,32 +33,39 @@ export async function POST(req: NextRequest) {
             },
             body: externalFormData,
         });
-
+        
         if (!response.ok) {
+            const errorData = await response.json().catch(() => null);
             return NextResponse.json({
                 error: 'File processing failed',
-                status: response.status
+                status: response.status,
+                details: errorData || 'Unknown error'
             }, { status: response.status });
         }
 
-        // Parse the response and ensure we're returning text content
         const result = await response.json();
-        let content = '';
-        if (typeof result === 'string') {
-            content = result;
+
+        // Handle DOCX specific response format
+        if (type === 'docx') {
+            if (result.status === 200 && result.data) {
+                return NextResponse.json({ content: result.data });
+            }
+        }
+        // Handle PDF and other formats
+        else if (typeof result === 'string') {
+            return NextResponse.json({ content: result });
         } else if (result.content) {
-            content = result.content;
+            return NextResponse.json({ content: result.content });
         } else if (result.text) {
-            content = result.text;
+            return NextResponse.json({ content: result.text });
         } else if (result.data) {
-            content = result.data;
-        } else if (result.status === 200 && typeof result.data === 'string') {
-            content = result.data;
-        } else {
-            throw new Error('Unexpected response format from external API');
+            return NextResponse.json({ content: result.data });
         }
 
-        return NextResponse.json({ content });
+        return NextResponse.json({
+            error: 'Unexpected response format',
+            details: 'Response format not recognized'
+        }, { status: 500 });
 
     } catch (error) {
         return NextResponse.json({

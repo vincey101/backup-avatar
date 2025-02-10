@@ -214,6 +214,20 @@ export default function Login() {
                             {isLoading ? 'Signing in...' : 'Sign in'}
                         </button>
                     </div>
+
+                    <div className="text-center mt-4">
+                        <p className="text-sm text-gray-300">
+                            Forgot login details?{' '}
+                            <a 
+                                href="https://appclick.convertri.com/support" 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="text-[#21ABCD] hover:text-[#1C96B5] transition-colors"
+                            >
+                                Contact Support
+                            </a>
+                        </p>
+                    </div>
                 </form>
             </div>
         </div>

@@ -20,8 +20,10 @@ import {
   CardBody,
   Tabs,
   Tab,
+  Input,
+  Textarea,
 } from "@nextui-org/react";
-import { Eye, Link } from 'lucide-react';
+import { Eye, Link, FileUp, File, Link as LinkIcon, FileText } from 'lucide-react';
 import CodeIcon from '@mui/icons-material/Code';
 import { toast } from 'sonner';
 import type { StartAvatarResponse } from "@heygen/streaming-avatar";
@@ -35,6 +37,7 @@ import StreamingAvatar, {
 import InteractiveAvatarTextInput from '@/components/InteractiveAvatarTextInput';
 import { SendHorizontal, Mic } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { TrashIcon } from '@heroicons/react/24/outline';
 
 interface Project {
   id: number;
@@ -49,6 +52,22 @@ interface Project {
   user_id: number;
   video_encoding: string;
 }
+
+// Add this helper function at the top level, similar to AvatarTemplateLibrary.tsx
+const getUserAccessLevel = () => {
+  try {
+    const userData = localStorage.getItem('userData');
+    if (!userData) return null;
+    
+    const { user } = JSON.parse(userData);
+    return {
+      oto_1: user.oto_1
+    };
+  } catch (error) {
+    console.error('Error parsing user data:', error);
+    return null;
+  }
+};
 
 export default function ManageProjects() {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -72,7 +91,32 @@ export default function ManageProjects() {
   // Add state for copy feedback
   const [copiedProjectId, setCopiedProjectId] = useState<number | null>(null);
 
+  // New state for tracking which project is being deleted
+  const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
+  const {
+    isOpen: isDeleteModalOpen,
+    onOpen: onDeleteModalOpen,
+    onClose: onDeleteModalClose
+  } = useDisclosure();
+
   const router = useRouter();
+
+  const [userAccess, setUserAccess] = useState<{ oto_1: number } | null>(null);
+
+  // Add new state variables
+  const [showUpdateModal, setShowUpdateModal] = useState(false);
+  const [selectedKnowledgeType, setSelectedKnowledgeType] = useState<'url' | 'text' | 'pdf' | 'doc' | null>(null);
+  const [knowledgeBase, setKnowledgeBase] = useState('');
+  const [isProcessingFile, setIsProcessingFile] = useState(false);
+  const [processingStatus, setProcessingStatus] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUpdating, setIsUpdating] = useState(false);
+
+  // Add useEffect to get user access level when component mounts
+  useEffect(() => {
+    const access = getUserAccessLevel();
+    setUserAccess(access);
+  }, []);
 
   useEffect(() => {
     fetchProjects();
@@ -86,45 +130,43 @@ export default function ManageProjects() {
 
   const fetchProjects = async () => {
     try {
-      // Get the token from localStorage
-      const userDataStr = localStorage.getItem('userData');
-      if (!userDataStr) {
-        throw new Error('User data not found');
-      }
+        const userDataStr = localStorage.getItem('userData');
+        if (!userDataStr) {
+            throw new Error('User data not found');
+        }
 
-      const userData = JSON.parse(userDataStr);
-      const token = userData.token;
+        const userData = JSON.parse(userDataStr);
+        const token = userData.token;
 
-      if (!token) {
-        throw new Error('Token not found');
-      }
+        if (!token) {
+            throw new Error('Token not found');
+        }
 
-      const response = await fetch('https://api.humanaiapp.com/api/get-ai-project', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
+        const response = await fetch('https://api.humanaiapp.com/api/get-ai-project', {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+            },
+        });
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
 
-      const data = await response.json();
-      setProjects(data.data || []); // Access the data array from the response
+        const data = await response.json();
+        setProjects(data.data || []); // Access the data array from the response
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to load projects';
-      setError(errorMessage);
-      toast.error(errorMessage);
-      console.error('Error fetching projects:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Failed to load projects';
+        setError(errorMessage);
+        console.error('Error fetching projects:', error);
     } finally {
-      setIsLoading(false);
+        setIsLoading(false);
     }
   };
 
   const handlePreview = (project: Project) => {
-    // Only pass the project name in URL
-    window.open(`/projects/manage/preview?name=${encodeURIComponent(project.project_name)}`, '_blank');
+    // The URL format is already correct in your code
+    window.open(`/app/${encodeURIComponent(project.project_name)}`, '_blank');
   };
 
   const handleEndSession = () => {
@@ -144,91 +186,25 @@ export default function ManageProjects() {
   };
 
   const handleCopyEmbed = (project: Project) => {
-    const embedCode = `<!-- Human AI Studio Embed Code -->
-<div id="human-ai-container"></div>
-<script>
-(async function() {
-  try {
-    // Initialize container
-    const container = document.getElementById('human-ai-container');
-    container.style.width = '100%';
-    container.style.height = '600px';
-    container.style.position = 'relative';
+    // Create the iframe HTML with dynamic project name
+    const iframeCode = `<iframe 
+    src="https://humanaiapp.com/app/${encodeURIComponent(project.project_name)}?hideNotifications=true&disablePreview=true" 
+    width="500" 
+    height="400" 
+    style="transform: scale(0.8); transform-origin: 0 0; border: 1px solid #ddd;"
+    allow="microphone; camera; display-capture; fullscreen; notifications"
+    sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-downloads allow-modals"
+    referrerpolicy="no-referrer"
+></iframe>`;
 
-    // Load HeyGen SDK - Using the correct official SDK URL
-    const script = document.createElement('script');
-    script.src = 'https://sdk.heygen.com/StreamingAvatar.umd.js';
-    document.head.appendChild(script);
-
-    await new Promise(resolve => script.onload = resolve);
-
-    // Get access token from your server
-    const tokenResponse = await fetch('YOUR_SERVER_ENDPOINT/get-access-token');
-    const accessToken = await tokenResponse.text();
-
-    // Initialize avatar with project settings
-    const avatar = new StreamingAvatar({
-      token: accessToken,
+    // Copy to clipboard
+    navigator.clipboard.writeText(iframeCode).then(() => {
+        setCopiedProjectId(project.id);
+        setTimeout(() => setCopiedProjectId(null), 2000); // Reset after 2 seconds
+        toast.success('Embed code copied to clipboard!');
+    }).catch(() => {
+        toast.error('Failed to copy embed code');
     });
-
-    // Start avatar session
-    await avatar.createStartAvatar({
-      avatarName: '${project.template}',
-      knowledgeBase: '${project.knowledge_base}',
-      voice: {
-        voiceId: '${project.voice}',
-        emotion: '${project.emotion}'
-      },
-      language: '${project.language}',
-      quality: '${project.quality}',
-      disableIdleTimeout: true
-    });
-
-    // Add chat interface
-    const chatInterface = document.createElement('div');
-    chatInterface.style.position = 'absolute';
-    chatInterface.style.bottom = '20px';
-    chatInterface.style.left = '50%';
-    chatInterface.style.transform = 'translateX(-50%)';
-    chatInterface.style.width = '80%';
-    chatInterface.style.maxWidth = '600px';
-    chatInterface.innerHTML = \`
-      <div style="background: rgba(0,0,0,0.4); backdrop-filter: blur(8px); padding: 15px; border-radius: 12px;">
-        <input 
-          type="text" 
-          placeholder="Type something to chat with the AI..."
-          style="width: 100%; padding: 10px; border-radius: 8px; border: none; background: white;"
-        >
-      </div>
-    \`;
-
-    container.appendChild(chatInterface);
-
-    // Handle chat input
-    const input = chatInterface.querySelector('input');
-    input.addEventListener('keypress', async (e) => {
-      if (e.key === 'Enter' && input.value.trim()) {
-        await avatar.speak({
-          text: input.value,
-          isFinal: true
-        });
-        input.value = '';
-      }
-    });
-
-  } catch (error) {
-    console.error('Error initializing Human AI:', error);
-  }
-})();
-</script>`;
-
-    navigator.clipboard.writeText(embedCode);
-    toast.success('Script copied to clipboard');
-
-    setCopiedProjectId(project.id);
-    setTimeout(() => {
-      setCopiedProjectId(null);
-    }, 2000);
   };
 
   const handleCopyLink = (projectUrl: string) => {
@@ -254,6 +230,275 @@ export default function ManageProjects() {
     }
   };
 
+  const handleDeleteClick = (project: Project) => {
+    setProjectToDelete(project);
+    onDeleteModalOpen();
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!projectToDelete) return;
+
+    try {
+      const userDataStr = localStorage.getItem('userData');
+      if (!userDataStr) {
+        throw new Error('User data not found');
+      }
+
+      const userData = JSON.parse(userDataStr);
+      const token = userData.token;
+
+      if (!token) {
+        throw new Error('Token not found');
+      }
+
+      const response = await fetch(`https://api.humanaiapp.com/api/delete-avater/${projectToDelete.id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      }
+
+      setProjects(prevProjects => prevProjects.filter(project => project.id !== projectToDelete.id));
+      toast.success('Project deleted successfully');
+      onDeleteModalClose();
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to delete project';
+      toast.error(errorMessage);
+      console.error('Error deleting project:', error);
+    }
+  };
+
+  // Update handleUpdateClick to properly set initial content
+  const handleUpdateClick = (project: Project) => {
+    setSelectedProject(project);
+    // Set initial knowledge base from API without processing
+    setKnowledgeBase(project.knowledge_base || '');
+    setSelectedKnowledgeType(null);
+    setProcessingStatus('Ready'); // Changed from 'Processed' to 'Ready' to differentiate
+    setShowUpdateModal(true);
+  };
+
+  // Update handleFileUpload to append new content to existing
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    console.log('File selected:', file.name, 'Type:', file.type);
+    // Check file extension
+    const fileExtension = file.name.split('.').pop()?.toLowerCase();
+    if (
+        (selectedKnowledgeType === 'pdf' && fileExtension !== 'pdf') ||
+        (selectedKnowledgeType === 'doc' && !['doc', 'docx'].includes(fileExtension || ''))
+    ) {
+        toast.error(`Please upload a valid ${selectedKnowledgeType?.toUpperCase()} file`);
+        return;
+    }
+
+    setIsProcessingFile(true);
+    setProcessingStatus('Processing new file...');
+
+    try {
+        let extractedText = '';
+
+        if (selectedKnowledgeType === 'pdf') {
+            extractedText = await extractPdfContent(file);
+        } else if (selectedKnowledgeType === 'doc') {
+            console.log('Processing DOCX file...');
+            extractedText = await extractDocxContent(file);
+            console.log('Extracted DOCX content:', extractedText ? 'Content received' : 'No content');
+        }
+
+        if (extractedText) {
+            // Combine existing knowledge base with new content
+            setKnowledgeBase(prevContent => {
+                const existingContent = prevContent.trim();
+                const newContent = extractedText.trim();
+                
+                // If there's existing content, add two newlines before new content
+                return existingContent 
+                    ? `${existingContent}\n\n${newContent}`
+                    : newContent;
+            });
+            
+            setProcessingStatus('Processed');
+        } else {
+            throw new Error('No content extracted from file');
+        }
+    } catch (error) {
+        console.error('File processing error:', error);
+        setProcessingStatus('Failed to process new file');
+        toast.error('Failed to process new file');
+    } finally {
+        setIsProcessingFile(false);
+    }
+  };
+
+  // Update click handlers to ensure fields are cleared
+  const handleUrlClick = () => {
+    setSelectedKnowledgeType('url');
+    setKnowledgeBase('');
+    setProcessingStatus('');
+  };
+
+  const handleTextClick = () => {
+    setSelectedKnowledgeType('text');
+    setKnowledgeBase('');
+    setProcessingStatus('');
+  };
+
+  const handlePdfClick = () => {
+    setSelectedKnowledgeType('pdf');
+    setKnowledgeBase('');
+    setProcessingStatus('');
+    if (fileInputRef.current) {
+        fileInputRef.current.accept = '.pdf, application/pdf';
+        fileInputRef.current.click();
+    }
+  };
+
+  const handleDocClick = () => {
+    setSelectedKnowledgeType('doc');
+    setKnowledgeBase('');
+    setProcessingStatus('');
+    if (fileInputRef.current) {
+        fileInputRef.current.accept = '.docx, .doc, application/vnd.openxmlformats-officedocument.wordprocessingml.document, application/msword';
+        fileInputRef.current.click();
+    }
+  };
+
+  const extractPdfContent = async (file: File): Promise<string> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('type', 'pdf');
+
+    try {
+        const userDataStr = localStorage.getItem('userData');
+        if (!userDataStr) {
+            throw new Error('User data not found');
+        }
+
+        const userData = JSON.parse(userDataStr);
+        const token = userData.token;
+
+        const response = await fetch('/api/process-document', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+            },
+            body: formData,
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to process PDF');
+        }
+
+        const data = await response.json();
+        return data.content;
+    } catch (error) {
+        console.error('Error processing PDF:', error);
+        throw error;
+    }
+  };
+
+  const extractDocxContent = async (file: File): Promise<string> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('type', 'docx');
+
+    try {
+        const userDataStr = localStorage.getItem('userData');
+        if (!userDataStr) {
+            throw new Error('User data not found');
+        }
+
+        const userData = JSON.parse(userDataStr);
+        const token = userData.token;
+
+        console.log('Processing DOCX with token:', token);
+
+        const response = await fetch('/api/process-document', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+            },
+            body: formData,
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to process DOCX');
+        }
+
+        const data = await response.json();
+        // Handle the specific DOCX response format
+        if (data.content && typeof data.content === 'string') {
+            return data.content;
+        } else if (data.content && data.content.data) {
+            return data.content.data;
+        } else {
+            throw new Error('Invalid response format from DOCX processing');
+        }
+    } catch (error) {
+        console.error('Error processing DOCX:', error);
+        throw error;
+    }
+  };
+
+  // Add the handleUpdate function back
+  const handleUpdate = async () => {
+    if (!selectedProject || !knowledgeBase) return;
+    
+    setIsUpdating(true);
+    try {
+        const userDataStr = localStorage.getItem('userData');
+        if (!userDataStr) throw new Error('User data not found');
+
+        const userData = JSON.parse(userDataStr);
+        const token = userData.token;
+
+        // Send update request with all required fields
+        const response = await fetch(`https://api.humanaiapp.com/api/update-avater/${selectedProject.id}`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                // Keep all original fields from the selected project
+                project_name: selectedProject.project_name,
+                niche: selectedProject.niche,
+                template: selectedProject.template,
+                language: selectedProject.language,
+                voice: selectedProject.voice,
+                emotion: selectedProject.emotion,
+                quality: selectedProject.quality || "high",
+                video_encoding: selectedProject.video_encoding || "h264",
+                // Add the new knowledge base content
+                knowledge_base: knowledgeBase
+            })
+        });
+
+        const data = await response.json();
+
+        if (data.status === "success") {
+            toast.success('Knowledge base updated successfully');
+            setShowUpdateModal(false);
+            fetchProjects(); // Refresh the list to get the updated knowledge_base
+        } else {
+            toast.error(data.message || 'Failed to update knowledge base');
+        }
+    } catch (error) {
+        toast.error('An error occurred while updating knowledge base');
+    } finally {
+        setIsUpdating(false);
+    }
+  };
+
   return (
     <div className="bg-white rounded-xl shadow-sm p-6">
       <div className="mb-6">
@@ -276,8 +521,8 @@ export default function ManageProjects() {
           <TableColumn className="w-[80px]">S/N</TableColumn>
           <TableColumn>PROJECT NAME</TableColumn>
           <TableColumn>NICHE</TableColumn>
-          <TableColumn>PREVIEW</TableColumn>
-          {/* <TableColumn>EMBED</TableColumn> */}
+          <TableColumn>ACTIONS</TableColumn>
+          <TableColumn>EMBED</TableColumn>
         </TableHeader>
         <TableBody emptyContent={
           <div className="text-center py-8 text-gray-500">
@@ -319,17 +564,38 @@ export default function ManageProjects() {
                 </Chip>
               </TableCell>
               <TableCell>
-                <Button
-                  size="sm"
-                  variant="flat"
-                  className="text-xs bg-emerald-50 text-emerald-600 hover:bg-emerald-100"
-                  startContent={<Eye className="w-3 h-3" />}
-                  onClick={() => handlePreview(project)}
-                >
-                  Preview
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="flat"
+                    className="text-xs bg-emerald-50 text-emerald-600 hover:bg-emerald-100"
+                    startContent={<Eye className="w-3 h-3" />}
+                    onClick={() => handlePreview(project)}
+                  >
+                    Preview
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="flat"
+                    className="text-xs bg-blue-50 text-blue-600 hover:bg-blue-100"
+                    onClick={() => handleUpdateClick(project)}
+                  >
+                    Update
+                  </Button>
+                  {userAccess?.oto_1 === 1 && (
+                    <Button
+                      size="sm"
+                      variant="flat"
+                      className="text-xs bg-red-50 text-red-600 hover:bg-red-100"
+                      startContent={<TrashIcon className="w-4 h-4 text-red-600" />}
+                      onClick={() => handleDeleteClick(project)}
+                    >
+                      Delete
+                    </Button>
+                  )}
+                </div>
               </TableCell>
-              {/* <TableCell>
+              <TableCell>
                 <Tooltip content="Copy Script Code">
                   <Button
                     size="sm"
@@ -341,7 +607,7 @@ export default function ManageProjects() {
                     {copiedProjectId === project.id ? "Copied!" : "Get Script"}
                   </Button>
                 </Tooltip>
-              </TableCell> */}
+              </TableCell>
             </TableRow>
           ))}
         </TableBody>
@@ -368,6 +634,44 @@ export default function ManageProjects() {
           </Button>
         </div>
       )}
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        isOpen={isDeleteModalOpen}
+        onClose={onDeleteModalClose}
+        size="sm"
+      >
+        <ModalContent>
+          <ModalBody className="py-6">
+            <div className="text-center">
+              <TrashIcon className="h-12 w-12 text-red-500 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                Delete Project
+              </h3>
+              <p className="text-sm text-gray-500 mb-6">
+                Are you sure you want to delete "{projectToDelete?.project_name}"? This action cannot be undone.
+              </p>
+              <div className="flex gap-3 justify-center">
+                <Button
+                  size="sm"
+                  variant="flat"
+                  color="default"
+                  onClick={onDeleteModalClose}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  color="danger"
+                  onClick={handleConfirmDelete}
+                >
+                  Delete Project
+                </Button>
+              </div>
+            </div>
+          </ModalBody>
+        </ModalContent>
+      </Modal>
 
       {/* Add Modal for Preview */}
       <Modal
@@ -476,6 +780,188 @@ export default function ManageProjects() {
           </ModalBody>
         </ModalContent>
       </Modal>
+
+      {/* Update Modal */}
+      <Modal 
+        isOpen={showUpdateModal} 
+        onOpenChange={setShowUpdateModal}
+        size="2xl"
+      >
+        <ModalContent>
+          {(onClose) => (
+            <div className="p-6">
+              <h3 className="text-lg font-semibold mb-4">Update Knowledge Base</h3>
+              
+              <div className="flex gap-3 mb-4">
+                <Tooltip content="Enter URL">
+                  <Button
+                    className={`flex items-center justify-center p-3 h-12 transition-all duration-300 ${
+                      selectedKnowledgeType === 'url'
+                      ? 'bg-gradient-to-tr from-purple-600 to-pink-500 text-white shadow-lg scale-105'
+                      : 'bg-gradient-to-tr from-white to-purple-50 hover:from-purple-50 hover:to-purple-100 border border-purple-100 shadow-sm hover:shadow-md hover:scale-105'
+                    }`}
+                    onClick={handleUrlClick}
+                  >
+                    <LinkIcon size={18} className={selectedKnowledgeType === 'url' ? 'text-white' : 'text-purple-500'} />
+                  </Button>
+                </Tooltip>
+
+                <Tooltip content="Text Content">
+                  <Button
+                    className={`flex items-center justify-center p-3 h-12 transition-all duration-300 ${
+                      selectedKnowledgeType === 'text'
+                      ? 'bg-gradient-to-tr from-purple-600 to-pink-500 text-white shadow-lg scale-105'
+                      : 'bg-gradient-to-tr from-white to-rose-50 hover:from-rose-50 hover:to-rose-100 border border-purple-100 shadow-sm hover:shadow-md hover:scale-105'
+                    }`}
+                    onClick={handleTextClick}
+                  >
+                    <FileText size={18} className={selectedKnowledgeType === 'text' ? 'text-white' : 'text-pink-500'} />
+                  </Button>
+                </Tooltip>
+
+                <Tooltip content="Upload PDF">
+                  <Button
+                    className={`flex items-center justify-center p-3 h-12 transition-all duration-300 ${
+                      selectedKnowledgeType === 'pdf'
+                      ? 'bg-gradient-to-tr from-purple-600 to-pink-500 text-white shadow-lg scale-105'
+                      : 'bg-gradient-to-tr from-white to-fuchsia-50 hover:from-fuchsia-50 hover:to-fuchsia-100 border border-purple-100 shadow-sm hover:shadow-md hover:scale-105'
+                    }`}
+                    onClick={handlePdfClick}
+                  >
+                    <FileUp
+                      size={18}
+                      className={selectedKnowledgeType === 'pdf' ? 'text-white' : 'text-fuchsia-500'}
+                    />
+                  </Button>
+                </Tooltip>
+
+                <Tooltip content="Upload Word Document">
+                  <Button
+                    className={`flex items-center justify-center p-3 h-12 transition-all duration-300 ${
+                      selectedKnowledgeType === 'doc'
+                      ? 'bg-gradient-to-tr from-purple-600 to-pink-500 text-white shadow-lg scale-105'
+                      : 'bg-gradient-to-tr from-white to-violet-50 hover:from-violet-50 hover:to-violet-100 border border-purple-100 shadow-sm hover:shadow-md hover:scale-105'
+                    }`}
+                    onClick={handleDocClick}
+                  >
+                    <File
+                      size={18}
+                      className={selectedKnowledgeType === 'doc' ? 'text-white' : 'text-violet-500'}
+                    />
+                  </Button>
+                </Tooltip>
+              </div>
+
+              {/* Add input fields based on selected type */}
+              {selectedKnowledgeType === 'url' && (
+                  <div className="mt-4">
+                      <Input
+                          placeholder="Enter URL"
+                          value={knowledgeBase}
+                          onChange={(e) => setKnowledgeBase(e.target.value)}
+                          startContent={<LinkIcon size={18} />}
+                          classNames={{
+                              input: "text-sm",
+                              base: "border-1 border-gray-200"
+                          }}
+                      />
+                  </div>
+              )}
+
+              {selectedKnowledgeType === 'text' && (
+                  <div className="mt-4">
+                      <Textarea
+                          placeholder="Enter or paste your text content"
+                          value={knowledgeBase}
+                          onValueChange={setKnowledgeBase}
+                          minRows={3}
+                          maxRows={4}
+                          classNames={{
+                              input: "text-sm py-1",
+                              base: "border-1 border-gray-200"
+                          }}
+                      />
+                  </div>
+              )}
+
+              {/* File upload status and preview */}
+              {(selectedKnowledgeType === 'pdf' || selectedKnowledgeType === 'doc') && (
+                  <div className="flex flex-col gap-2 mt-4">
+                      <div className="flex items-center gap-2 text-sm">
+                          <div className="flex items-center gap-2 px-2 py-1 bg-gray-50 rounded-lg">
+                              {selectedKnowledgeType === 'pdf' ? (
+                                  <FileUp size={14} className="text-fuchsia-500" />
+                              ) : (
+                                  <File size={14} className="text-violet-500" />
+                              )}
+                              <span className="text-gray-600 text-xs">
+                                  {isProcessingFile 
+                                      ? 'Processing new file...' 
+                                      : processingStatus === 'Ready' 
+                                          ? 'Existing content loaded' 
+                                          : processingStatus === 'Processed'
+                                              ? 'Content ready for editing'
+                                              : 'Select a file to process'
+                                  }
+                              </span>
+                              {isProcessingFile && <Spinner size="sm" color="secondary" />}
+                          </div>
+                      </div>
+
+                      {/* Show editable content area only after processing or when there's existing content */}
+                      {(processingStatus === 'Processed' || processingStatus === 'Ready') && knowledgeBase && (
+                          <div className="mt-2">
+                              <div className="flex justify-between items-center mb-2">
+                                  <span className="text-sm text-gray-600">Edit Content</span>
+                                  <span className="text-xs text-gray-400">{knowledgeBase.length} characters</span>
+                              </div>
+                              <Textarea
+                                  value={knowledgeBase}
+                                  onValueChange={setKnowledgeBase}
+                                  minRows={3}
+                                  maxRows={8}
+                                  placeholder="Edit your content here..."
+                                  classNames={{
+                                      input: "text-sm py-1",
+                                      base: "border-1 border-gray-200"
+                                  }}
+                              />
+                          </div>
+                      )}
+                  </div>
+              )}
+
+              <div className="flex justify-end gap-2 mt-6">
+                <Button
+                  variant="light"
+                  onPress={onClose}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  className="bg-gradient-to-tr from-indigo-500 to-indigo-300 text-white shadow-md hover:shadow-lg transform transition-all duration-200 hover:scale-[1.02]"
+                  onClick={handleUpdate}
+                  isLoading={isUpdating}
+                  isDisabled={!knowledgeBase.trim()}
+                >
+                  Update
+                </Button>
+              </div>
+            </div>
+          )}
+        </ModalContent>
+      </Modal>
+
+      <input
+        type="file"
+        ref={fileInputRef}
+        className="hidden"
+        onChange={handleFileUpload}
+        accept={selectedKnowledgeType === 'pdf' 
+            ? '.pdf, application/pdf' 
+            : '.docx, .doc, application/vnd.openxmlformats-officedocument.wordprocessingml.document, application/msword'
+        }
+      />
     </div>
   );
 } 

@@ -8,13 +8,21 @@ export function middleware(request: NextRequest) {
   // Get the query parameters
   const hasNameParam = request.nextUrl.searchParams.has('name');
 
-  // If it's the root path with a name parameter, allow access
-  if (path === '/' && hasNameParam) {
-    return NextResponse.next();
-  }
-
   // Get token from cookie - Change from 'token' to 'authToken'
   const authToken = request.cookies.get('authToken')?.value;
+
+  // If it's the root path, check authentication
+  if (path === '/') {
+    if (authToken) {
+      return NextResponse.redirect(new URL('/tutorial', request.url));
+    }
+    return NextResponse.redirect(new URL('/login', request.url));
+  }
+
+  // Allow public access to /app/[projectName] routes
+  if (path.startsWith('/app/') || path === '/agency') {
+    return NextResponse.next();
+  }
 
   // Define public paths that don't require authentication
   const publicPaths = ['/login', '/register'];

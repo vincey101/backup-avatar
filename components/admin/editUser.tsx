@@ -20,7 +20,7 @@ interface EditUserProps {
 
 interface FormValues {
     name: string;
-            email: string;
+    email: string;
     password?: string;
     oto_1: number;
     oto_2: number;
@@ -37,7 +37,7 @@ export default function EditUser({ dialog, setDialog, user, onUpdate }: EditUser
         initialValues: {
             name: user?.name || '',
             email: user?.email || '',
-        password: '',
+            password: '',
             oto_1: Number(user?.oto_1 || 0),
             oto_2: Number(user?.oto_2 || 0),
             oto_3: Number(user?.oto_3 || 0),
@@ -75,6 +75,10 @@ export default function EditUser({ dialog, setDialog, user, onUpdate }: EditUser
                     oto8: Number(values.oto_8)
                 };
 
+                console.log('Current user data:', user);
+                console.log('Form values:', values);
+                console.log('Request body:', requestBody);
+
                 const response = await fetch(`https://api.humanaiapp.com/api/update-user/${user.id}`, {
                     method: 'POST',
                     headers: {
@@ -85,6 +89,7 @@ export default function EditUser({ dialog, setDialog, user, onUpdate }: EditUser
                 });
 
                 const data = await response.json();
+                console.log('API Response:', data);
 
                 if (data.status === "success") {
                     toast.success('User updated successfully!');
@@ -94,6 +99,7 @@ export default function EditUser({ dialog, setDialog, user, onUpdate }: EditUser
                     toast.error(data.message || 'Failed to update user');
                 }
             } catch (error) {
+                console.error('Error updating user:', error);
                 toast.error('An error occurred while updating the user');
             }
         },
@@ -109,7 +115,7 @@ export default function EditUser({ dialog, setDialog, user, onUpdate }: EditUser
                 {(onClose) => (
                     <div className="p-6">
                         <h3 className="text-lg font-semibold mb-4">Edit User</h3>
-                    <form onSubmit={formik.handleSubmit} className="space-y-4">
+                        <form onSubmit={formik.handleSubmit} className="space-y-4">
                             <Input
                                 label="Name"
                                 name="name"
@@ -134,21 +140,26 @@ export default function EditUser({ dialog, setDialog, user, onUpdate }: EditUser
                             />
 
                             <div className="space-y-3">
-                                <p className="text-sm font-medium">Access Level</p>
-                                <div>
-                                    <Checkbox
-                                        isSelected={formik.values.oto_1 === 1}
-                                        onValueChange={(checked) => {
-                                            formik.setFieldValue('oto_1', checked ? 1 : 0);
-                                        }}
-                                        classNames={{
-                                            base: "w-full",
-                                            label: "text-sm font-medium",
-                                            wrapper: "p-2"
-                                        }}
-                                    >
-                                        OTO 1
-                                    </Checkbox>
+                                <p className="text-sm font-medium">OTO Access</p>
+                                <div className="grid grid-cols-4 gap-4">
+                                    {[1, 2, 3, 4, 5, 6, 7, 8].map((num) => (
+                                        <Checkbox
+                                            key={num}
+                                            isSelected={formik.values[`oto_${num}` as keyof FormValues] === 1}
+                                            onValueChange={(checked) => {
+                                                const newValue = checked ? 1 : 0;
+                                                console.log(`Changing oto_${num} from`, formik.values[`oto_${num}` as keyof FormValues], 'to', newValue);
+                                                formik.setFieldValue(`oto_${num}`, newValue);
+                                            }}
+                                            classNames={{
+                                                base: "w-full",
+                                                label: "text-sm font-medium",
+                                                wrapper: "p-2"
+                                            }}
+                                        >
+                                            OTO {num}
+                                        </Checkbox>
+                                    ))}
                                 </div>
                             </div>
 
@@ -170,10 +181,10 @@ export default function EditUser({ dialog, setDialog, user, onUpdate }: EditUser
                                     Update User
                                 </Button>
                             </div>
-                    </form>
-                </div>
+                        </form>
+                    </div>
                 )}
             </ModalContent>
         </Modal>
     );
-}
+} 

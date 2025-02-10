@@ -6,6 +6,7 @@ import * as Yup from "yup";
 import { useFormik } from "formik";
 import { LoadingButton } from "@mui/lab";
 import { Visibility, VisibilityOff } from "@mui/icons-material";
+import { toast } from "sonner";
 
 interface FormValues {
     firstname: string;
@@ -20,12 +21,24 @@ interface PasswordFormValues {
     userid: string;
 }
 
-interface TokenFormValues {
-    key: string;
-}
-
-const SuccessToast = (message: string) => alert(message);
-const ErrorToast = (message: string) => alert(message);
+// Update the LoadingButton styles to match the app's design
+const ButtonStyles = {
+    textTransform: 'none',
+    backgroundColor: 'transparent',
+    backgroundImage: 'linear-gradient(to right, #6366f1, #111827)',
+    borderRadius: '8px',
+    padding: '0.5rem 1.5rem',
+    fontSize: '0.9rem',
+    fontWeight: 500,
+    color: 'white',
+    boxShadow: '0 1px 3px 0 rgb(0 0 0 / 0.1)',
+    transition: 'all 200ms',
+    '&:hover': {
+        transform: 'scale(1.02)',
+        boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+        backgroundImage: 'linear-gradient(to right, #4f46e5, #1f2937)',
+    }
+};
 
 export default function Settings() {
     const [user, setUser] = useState({
@@ -34,7 +47,6 @@ export default function Settings() {
         username: '',
         email: ''
     });
-    const [credentials, setCredentials] = useState('');
 
     const validationSchema = Yup.object({
         firstname: Yup.string().required("Firstname is Required"),
@@ -51,17 +63,60 @@ export default function Settings() {
         onSubmit: async (values) => {
             setLoading(true);
             try {
-                SuccessToast('Profile updated successfully');
-                setUser({
-                    ...user,
-                    first_name: values.firstname,
-                    last_name: values.lastname,
-                    username: values.username
+                const userDataStr = localStorage.getItem('userData');
+                if (!userDataStr) {
+                    throw new Error('User data not found');
+                }
+
+                const userData = JSON.parse(userDataStr);
+                const token = userData.token;
+
+                // Combine firstname and lastname for the API
+                const requestBody = {
+                    name: `${values.firstname} ${values.lastname}`.trim(),
+                    email: user.email // Use the email from current user state
+                };
+
+                const response = await fetch('https://api.humanaiapp.com/api/profile', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(requestBody)
                 });
-            } catch (e: any) {
-                ErrorToast(e.message || 'Failed to update profile');
+
+                const data = await response.json();
+
+                if (data.status === "success") {
+                    // Update local storage with new user data
+                    const updatedUserData = {
+                        ...userData,
+                        user: {
+                            ...userData.user,
+                            first_name: values.firstname,
+                            last_name: values.lastname,
+                            name: requestBody.name
+                        }
+                    };
+                    localStorage.setItem('userData', JSON.stringify(updatedUserData));
+
+                    // Update local state
+                    setUser(prev => ({
+                        ...prev,
+                        first_name: values.firstname,
+                        last_name: values.lastname
+                    }));
+
+                    toast.success('Profile updated successfully');
+                } else {
+                    toast.error(data.message || 'Failed to update profile');
+                }
+            } catch (error) {
+                toast.error('An error occurred while updating the profile');
+            } finally {
+                setLoading(false);
             }
-            setLoading(false);
         }
     });
 
@@ -82,22 +137,11 @@ export default function Settings() {
         onSubmit: async (values, { resetForm }) => submitPassword(values, resetForm)
     });
 
-    const tokenFormik = useFormik<TokenFormValues>({
-        initialValues: {
-            key: credentials || '',
-        },
-        validationSchema: Yup.object({
-            key: Yup.string().required('Credential key is required'),
-        }),
-        onSubmit: async (values) => submitToken(values)
-    });
-
     const [showOld, setOld] = useState(false)
     const [showNew, setNew] = useState(false)
     const [showConfirm, setConfirm] = useState(false)
     const [loading, setLoading] = useState(false)
     const [passLoading, setPassLoading] = useState(false)
-    const [tokenLoading, setTokenLoading] = useState(false)
 
     // Move localStorage access to useEffect
     useEffect(() => {
@@ -117,26 +161,45 @@ export default function Settings() {
         }
     }, []);
 
-    const submitPassword = async (values: any, resetForm: Function) => {
+    const submitPassword = async (values: PasswordFormValues, resetForm: Function) => {
         setPassLoading(true);
         try {
-            SuccessToast('Password changed successfully');
-            resetForm();
-        } catch (e: any) {
-            ErrorToast(e.message || 'Failed to update password');
-        }
-        setPassLoading(false);
-    };
+            const userDataStr = localStorage.getItem('userData');
+            if (!userDataStr) {
+                throw new Error('User data not found');
+            }
 
-    const submitToken = async (values: { key: string }) => {
-        setTokenLoading(true);
-        try {
-            setCredentials(values.key);
-            SuccessToast('Token updated successfully');
-        } catch (e: any) {
-            ErrorToast(e.message || 'Failed to update token');
+            const userData = JSON.parse(userDataStr);
+            const token = userData.token;
+
+            // Format the request body according to API expectations
+            const requestBody = {
+                current_password: values.oldPassword,
+                password: values.password
+            };
+
+            const response = await fetch('https://api.humanaiapp.com/api/change-password', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(requestBody)
+            });
+
+            const data = await response.json();
+
+            if (data.status === "success") {
+                toast.success('Password changed successfully');
+                resetForm();
+            } else {
+                toast.error(data.message || 'Failed to update password');
+            }
+        } catch (error) {
+            toast.error('An error occurred while updating the password');
+        } finally {
+            setPassLoading(false);
         }
-        setTokenLoading(false);
     };
 
     return (
@@ -154,120 +217,6 @@ export default function Settings() {
                     }}>
                         Settings
                     </h4>
-
-                    <div className={'dashboard-card'} style={{
-                        backgroundColor: '#fff',
-                        borderRadius: '12px',
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
-                        marginBottom: '2rem'
-                    }}>
-                        <Box className={'dashboard-card-content'} sx={{
-                            padding: '2rem',
-                            flexDirection: { xs: 'column', sm: 'row' },
-                            gap: '2rem'
-                        }}>
-                            <div style={{ flex: '0 0 250px' }}>
-                                <h5 style={{
-                                    fontSize: '1.4rem',
-                                    fontWeight: 600,
-                                    color: '#1a1a1a',
-                                    marginBottom: '0.5rem'
-                                }}>
-                                    API Key
-                                </h5>
-                                <p style={{
-                                    color: '#666',
-                                    fontSize: '0.9rem',
-                                    marginBottom: '1.5rem'
-                                }}>
-                                    Configure your OpenAI API key
-                                </p>
-
-                                <div style={{
-                                    backgroundColor: '#f8f9fa',
-                                    padding: '1rem',
-                                    borderRadius: '8px',
-                                    marginBottom: '1rem'
-                                }}>
-                                    <p style={{
-                                        color: '#333',
-                                        fontSize: '0.9rem',
-                                        fontWeight: '600',
-                                        marginBottom: '0.5rem'
-                                    }}>
-                                        How to get your API Key
-                                    </p>
-                                    <ol style={{
-                                        margin: '0',
-                                        paddingLeft: '1.2rem',
-                                        fontSize: '0.85rem',
-                                        color: '#666'
-                                    }}>
-                                        <li style={{ marginBottom: '0.5rem' }}>
-                                            <a href={'https://platform.openai.com/account/api-keys'}
-                                                target={'_blank'}
-                                                style={{ color: '#2563eb', textDecoration: 'none' }}>
-                                                Visit OpenAI Platform
-                                            </a>
-                                        </li>
-                                        <li style={{ marginBottom: '0.5rem' }}>Sign up for an account</li>
-                                        <li style={{ marginBottom: '0.5rem' }}>Click "Create New Secret Key"</li>
-                                        <li>Copy and paste the key below</li>
-                                    </ol>
-                                </div>
-                            </div>
-
-                            <Box sx={{
-                                flex: '1',
-                                maxWidth: '500px'
-                            }}>
-                                <form onSubmit={tokenFormik.handleSubmit}>
-                                    <TextField
-                                        label={'Credential Token'}
-                                        placeholder={'Enter your token '}
-                                        id={'key'}
-                                        name={'key'}
-                                        margin={'dense'}
-                                        size={'medium'}
-                                        type={'text'}
-                                        fullWidth
-                                        color={'primary'}
-                                        value={tokenFormik.values.key}
-                                        onChange={tokenFormik.handleChange}
-                                        error={tokenFormik.touched.key && Boolean(tokenFormik.errors.key)}
-                                        helperText={tokenFormik.touched.key && tokenFormik.errors.key}
-                                        variant={'outlined'}
-                                        sx={{
-                                            '& .MuiOutlinedInput-root': {
-                                                borderRadius: '8px',
-                                            },
-                                            marginBottom: '1rem'
-                                        }}
-                                    />
-                                    <LoadingButton
-                                        loading={tokenLoading}
-                                        type={'submit'}
-                                        disableElevation
-                                        variant={'contained'}
-                                        sx={{
-                                            textTransform: 'none',
-                                            backgroundColor: '#1D2136',
-                                            borderRadius: '8px',
-                                            padding: '0.5rem 1.5rem',
-                                            fontSize: '0.9rem',
-                                            fontWeight: 500,
-                                            '&:hover': {
-                                                backgroundColor: '#282d4a'
-                                            }
-                                        }}
-                                        size={'large'}
-                                    >
-                                        Update API Key
-                                    </LoadingButton>
-                                </form>
-                            </Box>
-                        </Box>
-                    </div>
 
                     <div className={'dashboard-card'} style={{
                         backgroundColor: '#fff',
@@ -374,17 +323,7 @@ export default function Settings() {
                                         type={'submit'}
                                         disableElevation
                                         variant={'contained'}
-                                        sx={{
-                                            textTransform: 'none',
-                                            backgroundColor: '#1D2136',
-                                            '&:hover': {
-                                                backgroundColor: '#282d4a'
-                                            },
-                                            borderRadius: '8px',
-                                            padding: '0.5rem 1.5rem',
-                                            fontSize: '0.9rem',
-                                            fontWeight: 500
-                                        }}
+                                        sx={ButtonStyles}
                                         size={'large'}
                                     >
                                         Save Changes
@@ -522,17 +461,7 @@ export default function Settings() {
                                         type={'submit'}
                                         disableElevation
                                         variant={'contained'}
-                                        sx={{
-                                            textTransform: 'none',
-                                            backgroundColor: '#1D2136',
-                                            '&:hover': {
-                                                backgroundColor: '#282d4a'
-                                            },
-                                            borderRadius: '8px',
-                                            padding: '0.5rem 1.5rem',
-                                            fontSize: '0.9rem',
-                                            fontWeight: 500
-                                        }}
+                                        sx={ButtonStyles}
                                         size={'large'}
                                     >
                                         Save Changes

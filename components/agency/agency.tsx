@@ -1,262 +1,231 @@
 'use client';
 
 import { useCallback, useEffect, useState } from "react";
-import { PlusIcon, PencilIcon, XMarkIcon } from '@heroicons/react/24/outline';
-import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/20/solid';
+import { PencilIcon, TrashIcon, PlusIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import { format } from "date-fns";
 import AddUser from "./addUser";
 import DeleteUser from "./deleteUser";
 import EditUser from "./editUser";
-import { format } from "date-fns";
-import lodash from 'lodash';
-
-// Types
-interface User {
-    id: number;
-    username: string;
-    email: string;
-    first_name: string;
-    last_name: string;
-    is_active: boolean;
-}
-
-interface Plan {
-    id: number;
-    name: string;
-    oto2: number;
-}
+import { Input } from "@nextui-org/react";
+import debounce from 'lodash/debounce';
+import { toast } from "sonner";
 
 interface AgencyUser {
-    user: User;
-    plan: Plan;
-    created_at: string;
-}
-
-interface PlanItem {
     id: number;
     name: string;
+    email: string;
+    role: string;
+    email_verified_at: null | string;
+    fcm_token: null | string;
+    user_pic: null | string;
+    reseller_id: number;
+    fe: number;
+    oto_1: number;
+    oto_2: number;
+    oto_3: number;
+    oto_4: number;
+    oto_5: number;
+    oto_6: number;
+    oto_7: number;
+    oto_8: number;
+    created_at: string;
+    updated_at: string;
+    is_email_verified: number;
 }
 
 export default function Agency() {
-    const [loading, setLoading] = useState(false);
-    const [deleteDialog, setDel] = useState(false);
-    const [delID, setDeleteID] = useState('');
-    const [editDetails, setEditDetails] = useState<AgencyUser | null>(null);
-    const [editDialog, setEditDialog] = useState(false);
-    const [addDialog, setAddDialog] = useState(false);
-    const [planList, setPlanList] = useState<PlanItem[]>([]);
+    const [users, setUsers] = useState<AgencyUser[]>([]);
+    const [filteredUsers, setFilteredUsers] = useState<AgencyUser[]>([]);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const [showAddModal, setShowAddModal] = useState(false);
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [deleteUserId, setDeleteUserId] = useState<number | null>(null);
+    const [editingUser, setEditingUser] = useState<AgencyUser | null>(null);
+    const [showEditModal, setShowEditModal] = useState(false);
 
-    // Pagination states
-    const [currentPage, setCurrentPage] = useState(1);
-    const [itemsPerPage] = useState(10);
-    const [agencyUsers, setAgencyUsers] = useState<AgencyUser[]>([]);
-
-    // Calculate pagination values
-    const indexOfLastItem = currentPage * itemsPerPage;
-    const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-    const currentItems = agencyUsers.slice(indexOfFirstItem, indexOfLastItem);
-    const totalPages = Math.ceil(agencyUsers.length / itemsPerPage);
-
-    // Updated fetch function with error handling
-    const fetchAgencyUsers = useCallback(async () => {
-        try {
-            const response = await fetch('/api/agency/users');
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            const contentType = response.headers.get("content-type");
-            if (!contentType || !contentType.includes("application/json")) {
-                throw new TypeError("Oops, we haven't got JSON!");
-            }
-            const data = await response.json();
-            if (data.success) {
-                setAgencyUsers(data.users);
-            }
-        } catch (error) {
-            console.error('Failed to fetch agency users:', error);
-            setAgencyUsers([]); // Set empty array on error
+    // Debounced search function
+    const debouncedSearch = debounce((query: string) => {
+        if (!query.trim()) {
+            setFilteredUsers(users);
+            return;
         }
-    }, []);
 
-    // Updated useEffect with better error handling
+        const lowercaseQuery = query.toLowerCase();
+        const filtered = users.filter(user => 
+            user.name.toLowerCase().includes(lowercaseQuery)
+        );
+        setFilteredUsers(filtered);
+    }, 300);
+
+    // Update filtered users when users or search query changes
     useEffect(() => {
-        const fetchData = async () => {
-            try {
-                const [plansResponse, usersResponse] = await Promise.all([
-                    fetch('/api/plans'),
-                    fetch('/api/agency/users')
-                ]);
-
-                // Check if responses are ok and are JSON
-                if (!plansResponse.ok || !usersResponse.ok) {
-                    throw new Error('Network response was not ok');
-                }
-
-                const plansData = await plansResponse.json();
-                const usersData = await usersResponse.json();
-
-                if (plansData.success) {
-                    setPlanList(plansData.plans);
-                }
-                if (usersData.success) {
-                    setAgencyUsers(usersData.users);
-                }
-            } catch (error) {
-                console.error('Failed to fetch data:', error);
-                setPlanList([]);
-                setAgencyUsers([]);
-            }
+        debouncedSearch(searchQuery);
+        return () => {
+            debouncedSearch.cancel();
         };
+    }, [users, searchQuery]);
 
-        fetchData();
+    // Initialize filtered users when users are loaded
+    useEffect(() => {
+        setFilteredUsers(users);
+    }, [users]);
+
+    const fetchUsers = useCallback(async () => {
+        try {
+            const userDataStr = localStorage.getItem('userData');
+            if (!userDataStr) {
+                throw new Error('User data not found');
+            }
+
+            const userData = JSON.parse(userDataStr);
+            const token = userData.token;
+
+            if (!token) {
+                throw new Error('Token not found');
+            }
+
+            const response = await fetch('https://api.humanaiapp.com/api/agency', {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                },
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const data = await response.json();
+
+            if (data.status === "success" && Array.isArray(data.users)) {
+                setUsers(data.users);
+            } else {
+                setUsers([]);
+            }
+        } catch (error) {
+            setError(error instanceof Error ? error.message : 'Failed to load users');
+        } finally {
+            setIsLoading(false);
+        }
     }, []);
 
-    // Updated deleteUser function with error handling
-    const deleteUser = useCallback(async () => {
-        setLoading(true);
+    useEffect(() => {
+        fetchUsers();
+    }, [fetchUsers]);
+
+    const handleEdit = (user: AgencyUser) => {
+        setEditingUser(user);
+        setShowEditModal(true);
+    };
+
+    // Reset editing user when modal closes
+    const handleEditModalClose = () => {
+        setShowEditModal(false);
+        setEditingUser(null); // Clear the editing user
+    };
+
+    const handleDelete = async () => {
+        if (!deleteUserId) return;
         try {
-            const response = await fetch(`/api/agency/users/${delID}`, {
+            const userDataStr = localStorage.getItem('userData');
+            if (!userDataStr) {
+                return;
+            }
+
+            const userData = JSON.parse(userDataStr);
+            const token = userData.token;
+
+            const response = await fetch(`https://api.humanaiapp.com/api/delete-agency/${deleteUserId}`, {
                 method: 'DELETE',
-            });
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            const data = await response.json();
-
-            if (data.success) {
-                await fetchAgencyUsers();
-                setDel(false);
-            }
-        } catch (error) {
-            console.error('Failed to delete user:', error);
-        } finally {
-            setLoading(false);
-        }
-    }, [delID, fetchAgencyUsers]);
-
-    // Updated toggleStatus function with error handling
-    const toggleStatus = useCallback(async (user: User) => {
-        setLoading(true);
-        try {
-            const response = await fetch(`/api/agency/users/${user.id}`, {
-                method: 'PATCH',
                 headers: {
+                    'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({
-                    is_active: !user.is_active,
-                }),
             });
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
+
             const data = await response.json();
 
-            if (data.success) {
-                await fetchAgencyUsers();
+            if (data.status === "success") {
+                setShowDeleteModal(false);
+                // Refresh the users list
+                await fetchUsers();
+            } else {
+                console.error('Failed to delete user:', data.message);
             }
         } catch (error) {
-            console.error('Failed to toggle status:', error);
-        } finally {
-            setLoading(false);
-        }
-    }, [fetchAgencyUsers]);
-
-    const addAgencyUser = async (values: any, resetForm: () => void) => {
-        setLoading(true);
-        try {
-            const response = await fetch('/api/agency/users', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(values),
-            });
-            const data = await response.json();
-
-            if (data.success) {
-                await fetchAgencyUsers();
-                setAddDialog(false);
-                resetForm();
-            }
-        } catch (error) {
-            console.error('Failed to add user:', error);
-        } finally {
-            setLoading(false);
+            console.error('Error deleting user:', error);
         }
     };
 
-    const editUser = async (values: any, resetForm: () => void) => {
-        setLoading(true);
+    // Reset delete user when modal closes
+    const handleDeleteModalClose = () => {
+        setShowDeleteModal(false);
+        setDeleteUserId(null);
+    };
+
+    const handleAddUser = useCallback(async () => {
         try {
-            const response = await fetch(`/api/agency/users/${values.userid}`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(values),
-            });
-            const data = await response.json();
-
-            if (data.success) {
-                await fetchAgencyUsers();
-                setEditDialog(false);
-                resetForm();
-            }
+            setIsLoading(true);
+            await fetchUsers(); // Refresh the users list
         } catch (error) {
-            console.error('Failed to edit user:', error);
+            toast.error('Error refreshing users list');
         } finally {
-            setLoading(false);
+            setIsLoading(false);
         }
-    };
+    }, [fetchUsers]);
 
-    const planStringMapper = (plan: {
-        oto1?: number;
-        oto2?: number;
-        oto3?: number;
-        oto4?: number;
-        oto5?: number;
-        oto6?: number;
-        oto7?: number;
-        oto8?: number;
-        user?: object;
-    }) => {
-        if (!plan || Object.keys(plan).length === 0) return '';
+    if (isLoading) {
+        return (
+            <div className="p-8 flex justify-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+            </div>
+        );
+    }
 
-        let content: string = '';
-        let index: number = 0;
-
-        for (const item in plan) {
-            if (item?.includes('oto') && plan[item as keyof typeof plan]) {
-                const planItem = lodash.find(planList, (p) => p.id === index);
-                content += `${planItem?.name || ''} `;
-            }
-            index += 1;
-        }
-
-        return content.trim().replaceAll(' ', ', ');
-    };
+    if (error) {
+    return (
+            <div className="p-8">
+                <p className="text-red-500">Error: {error}</p>
+            </div>
+        );
+    }
 
     return (
-        <div className="w-full max-w-[1400px] mx-auto font-sans p-8">
-            <div className="flex justify-between items-center mb-8 mt-4">
-                <h1 className="text-3xl font-bold text-gray-900">Agency</h1>
+        <div className="p-8">
+            <div className="mb-6 flex justify-between items-center">
+                <h2 className="text-xl font-semibold text-gray-900">Agency Users</h2>
                 <button
-                    onClick={() => setAddDialog(true)}
-                    className="inline-flex items-center px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-md transition-colors"
+                    onClick={() => setShowAddModal(true)}
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg text-white text-sm
+                        bg-gradient-to-r from-indigo-500 to-gray-900
+                        hover:from-indigo-600 hover:to-gray-800
+                        transform transition-all duration-200 hover:scale-[1.02]
+                        shadow-md hover:shadow-lg"
                 >
-                    <PlusIcon className="w-5 h-5 mr-2" />
+                    <PlusIcon className="w-4 h-4" />
                     Add New User
                 </button>
             </div>
 
-            <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+            {/* Search Input */}
+            <div className="mb-4">
+                <Input
+                    type="text"
+                    placeholder="Search by username..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    startContent={<MagnifyingGlassIcon className="w-4 h-4 text-gray-400" />}
+                    className="max-w-xs"
+                />
+            </div>
+
+            <div className="bg-white rounded-lg shadow overflow-hidden">
                 <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-gray-200">
                         <thead className="bg-gray-50">
                             <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    ID
-                                </th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     Username
                                 </th>
@@ -264,16 +233,10 @@ export default function Agency() {
                                     Email
                                 </th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Full Name
+                                    Role
                                 </th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Plans
-                                </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Date Added
-                                </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Active
+                                    Created At
                                 </th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     Actions
@@ -281,65 +244,43 @@ export default function Agency() {
                             </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
-                            {currentItems.length === 0 ? (
+                            {filteredUsers.length === 0 ? (
                                 <tr>
-                                    <td colSpan={8} className="px-6 py-4 text-center text-gray-500">
-                                        No users found
+                                    <td colSpan={5} className="px-6 py-4 text-center text-gray-500">
+                                        {searchQuery ? 'No users found matching your search' : 'No users found'}
                                     </td>
                                 </tr>
                             ) : (
-                                currentItems.map((user: any, index: number) => (
-                                    <tr key={user.user.id} className="hover:bg-gray-50">
+                                filteredUsers.map((user) => (
+                                    <tr key={user.id} className="hover:bg-gray-50">
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                            {index + 1}
+                                            {user.name}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                            {user.user.username}
+                                            {user.email}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                            {user.user.email}
+                                            {user.role}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                            {`${user.user.first_name} ${user.user.last_name}`}
+                                            {format(new Date(user.created_at), 'PPp')}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                            {planStringMapper(user.plan)}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                            {format(new Date(user.created_at), 'Pp')}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <label className="relative inline-flex items-center cursor-pointer">
-                                                <input
-                                                    type="checkbox"
-                                                    className="sr-only peer"
-                                                    checked={user.user.is_active}
-                                                    onChange={(e) => {
-                                                        toggleStatus(user.user)
-                                                    }}
-                                                />
-                                                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                                            </label>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                            <div className="flex space-x-2">
+                                            <div className="flex items-center space-x-3">
                                                 <button
-                                                    onClick={() => {
-                                                        setEditDialog(true)
-                                                        setEditDetails(user)
-                                                    }}
-                                                    className="text-blue-600 hover:text-blue-800"
+                                                    onClick={() => handleEdit(user)}
+                                                    className="p-1 rounded-full hover:bg-gray-100 transition-colors"
                                                 >
-                                                    <PencilIcon className="w-5 h-5" />
+                                                    <PencilIcon className="w-4 h-4 text-blue-600" />
                                                 </button>
                                                 <button
                                                     onClick={() => {
-                                                        setDel(true)
-                                                        setDeleteID(user.user.id)
+                                                        setDeleteUserId(user.id);
+                                                        setShowDeleteModal(true);
                                                     }}
-                                                    className="text-red-600 hover:text-red-800"
+                                                    className="p-1 rounded-full hover:bg-gray-100 transition-colors"
                                                 >
-                                                    <XMarkIcon className="w-5 h-5" />
+                                                    <TrashIcon className="w-4 h-4 text-red-600" />
                                                 </button>
                                             </div>
                                         </td>
@@ -349,71 +290,33 @@ export default function Agency() {
                         </tbody>
                     </table>
                 </div>
-
-                {/* Pagination */}
-                <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
-                    <div className="flex-1 flex justify-between sm:hidden">
-                        <button
-                            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                            disabled={currentPage === 1}
-                            className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
-                        >
-                            Previous
-                        </button>
-                        <button
-                            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                            disabled={currentPage === totalPages}
-                            className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
-                        >
-                            Next
-                        </button>
-                    </div>
-                    <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-                        <div>
-                            <p className="text-sm text-gray-700">
-                                Showing <span className="font-medium">{indexOfFirstItem + 1}</span> to{' '}
-                                <span className="font-medium">
-                                    {Math.min(indexOfLastItem, agencyUsers.length)}
-                                </span>{' '}
-                                of <span className="font-medium">{agencyUsers.length}</span> results
-                            </p>
-                        </div>
-                        <div>
-                            <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
-                                <button
-                                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                                    disabled={currentPage === 1}
-                                    className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
-                                >
-                                    <span className="sr-only">Previous</span>
-                                    <ChevronLeftIcon className="h-5 w-5" aria-hidden="true" />
-                                </button>
-                                <button
-                                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                                    disabled={currentPage === totalPages}
-                                    className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
-                                >
-                                    <span className="sr-only">Next</span>
-                                    <ChevronRightIcon className="h-5 w-5" aria-hidden="true" />
-                                </button>
-                            </nav>
-                        </div>
-                    </div>
-                </div>
             </div>
 
-            {/* Modals */}
-            <AddUser dialog={addDialog} setDialog={setAddDialog} loading={loading} addUser={addAgencyUser} />
-            <DeleteUser dialog={deleteDialog} setDialog={setDel} deleteUser={deleteUser} loading={loading} />
-            {editDialog && editDetails && (
+            {/* Add User Modal */}
+            <AddUser 
+                dialog={showAddModal}
+                setDialog={setShowAddModal}
+                loading={isLoading}
+                addUser={handleAddUser}
+            />
+
+            {/* Delete Confirmation Modal */}
+            <DeleteUser
+                dialog={showDeleteModal}
+                setDialog={handleDeleteModalClose} // Use new handler
+                deleteUser={handleDelete}
+                loading={isLoading}
+            />
+
+            {/* Edit User Modal */}
+            {editingUser && (
                 <EditUser
-                    details={editDetails}
-                    editUser={editUser}
-                    dialog={editDialog}
-                    setDialog={setEditDialog}
-                    loading={loading}
+                    dialog={showEditModal}
+                    setDialog={handleEditModalClose} // Use new handler
+                    user={editingUser}
+                    onUpdate={fetchUsers}
                 />
             )}
         </div>
-    )
+    );
 }

@@ -83,13 +83,42 @@ export default function InteractiveAvatar() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [processingStatus, setProcessingStatus] = useState<string>('');
 
-  const [projectDetails, setProjectDetails] = useState(() => {
+//   const [projectDetails, setProjectDetails] = useState(() => {
+//     const savedProject = localStorage.getItem('avatarProject');
+//     return savedProject ? JSON.parse(savedProject) : {
+//       projectName: '',
+//       niche: '',
+//     };
+//   });
+
+const [projectDetails, setProjectDetails] = useState<{ projectName: string; niche: string }>({
+  projectName: '',
+  niche: '',
+});
+
+useEffect(() => {
+  if (typeof window !== "undefined") { // ✅ Ensure this runs only in the browser
     const savedProject = localStorage.getItem('avatarProject');
-    return savedProject ? JSON.parse(savedProject) : {
-      projectName: '',
-      niche: '',
-    };
-  });
+    if (savedProject) {
+      setProjectDetails(JSON.parse(savedProject));
+    }
+  }
+}, []);
+
+const [hasValidToken, setHasValidToken] = useState(false);
+
+useEffect(() => {
+  if (typeof window !== "undefined") { // ✅ Ensure localStorage runs in the browser
+    const userDataStr = localStorage.getItem('userData');
+    if (userDataStr) {
+      const userData = JSON.parse(userDataStr);
+      setHasValidToken(!!userData.token);
+    } else {
+      setHasValidToken(false);
+    }
+  }
+}, []);
+
 
   const EMOTION_OPTIONS: EmotionOption[] = [
     { key: '', label: 'Select Emotion' },
@@ -101,18 +130,18 @@ export default function InteractiveAvatar() {
   ];
 
   // Add state to track if we have a valid token
-  const [hasValidToken, setHasValidToken] = useState(false);
+  //const [hasValidToken, setHasValidToken] = useState(false);
 
   // Update the token check to use localStorage
-  useEffect(() => {
-    const userDataStr = localStorage.getItem('userData');
-    if (userDataStr) {
-        const userData = JSON.parse(userDataStr);
-        setHasValidToken(!!userData.token);
-    } else {
-        setHasValidToken(false);
-    }
-  }, []);
+//   useEffect(() => {
+//     const userDataStr = localStorage.getItem('userData');
+//     if (userDataStr) {
+//         const userData = JSON.parse(userDataStr);
+//         setHasValidToken(!!userData.token);
+//     } else {
+//         setHasValidToken(false);
+//     }
+//   }, []);
 
   useEffect(() => {
     const selectedAvatarId = localStorage.getItem('selectedAvatarId');
@@ -138,6 +167,34 @@ export default function InteractiveAvatar() {
 
     return "";
   }
+  
+  const [timeLeft, setTimeLeft] = useState<number>(0);
+
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+
+
+  const getSessionDuration = () => {
+    const userDataStr = localStorage.getItem('userData');
+
+    if (!userDataStr) return 0;
+
+    const userData = JSON.parse(userDataStr);
+
+    if (userData.user.oto_1 === 1) return 5 * 60; // 5 minutes in seconds
+
+    if (userData.user.fe === 1) return 2 * 60; // 2 minutes in seconds
+
+    return 2 * 60; // Default to 2 minutes
+
+  };
+
+  const formatTime = (seconds: number): string => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+
+  };
 
   async function startSession() {
     setIsLoadingSession(true);
@@ -209,6 +266,24 @@ export default function InteractiveAvatar() {
         useSilencePrompt: false
       });
       setChatMode("voice_mode");
+      // Start the timer after successful session start
+
+      const duration = getSessionDuration();
+      setTimeLeft(duration);
+      timerRef.current = setInterval(() => {
+        setTimeLeft((prev) => {
+          if (prev <= 1) {
+            // Clear interval and end session when time is up
+            if (timerRef.current) clearInterval(timerRef.current);
+            // Save project before ending session
+            handleSaveProject().then(() => {
+              endSession();
+            });
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
     } catch (error) {
       console.error("Error starting avatar session:", error);
       setLoadingMessage("Something went wrong. Please try again.");
@@ -236,8 +311,12 @@ export default function InteractiveAvatar() {
       });
   }
   async function endSession() {
+        if (timerRef.current) {
+      clearInterval(timerRef.current);
+    }
     await avatar.current?.stopAvatar();
     setStream(undefined);
+        setTimeLeft(0);
   }
 
   const handleChangeChatMode = useMemoizedFn(async (v) => {
@@ -263,7 +342,9 @@ export default function InteractiveAvatar() {
 
   useEffect(() => {
     return () => {
-      endSession();
+         if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
     };
   }, []);
 
@@ -410,12 +491,13 @@ export default function InteractiveAvatar() {
 
   // Add new state for save button loading
   const [isSaving, setIsSaving] = useState(false);
+  const [hasAutoSaved, setHasAutoSaved] = useState(false);
 
   // Update the handleSaveProject function
-  const handleSaveProject = async () => {
-    if (isSaving) return; // Prevent multiple clicks
+  const handleSaveProject = async (isAutoSave = false) => {
+    if (isSaving || (isAutoSave && hasAutoSaved)) return;
 
-    setIsSaving(true); // Start loading
+    setIsSaving(true);
     try {
       const payload: SaveProjectPayload = {
         project_name: projectDetails.projectName,
@@ -423,7 +505,6 @@ export default function InteractiveAvatar() {
         template: avatarId,
         knowledge_base: knowledgeBase,
         language: language,
-        // voice: "26b2064088674c80b1e5fc5ab1a068eb",
         emotion: emotion,
         quality: "high",
         video_encoding: "h264"
@@ -441,7 +522,19 @@ export default function InteractiveAvatar() {
       const data = await response.json();
 
       if (response.ok) {
-        toast.success('Project saved successfully!');
+        if (!isAutoSave) {
+          // For manual save
+          if (timerRef.current) {
+            clearInterval(timerRef.current);
+          }
+          await endSession();
+          toast.success('Project saved successfully!');
+          router.push('/projects/manage');
+        } else {
+          // For auto-save: just end session quietly
+          setHasAutoSaved(true);
+          await endSession();
+        }
       } else {
         toast.error(data.message || 'Failed to save project');
       }
@@ -449,9 +542,44 @@ export default function InteractiveAvatar() {
       toast.error('An error occurred while saving the project');
       console.error('Save project error:', error);
     } finally {
-      setIsSaving(false); // End loading regardless of outcome
+      setIsSaving(false);
     }
   };
+
+  // Update the timer logic
+  useEffect(() => {
+    if (stream && !timerRef.current && !hasAutoSaved) {
+      const duration = getSessionDuration();
+      setTimeLeft(duration);
+      timerRef.current = setInterval(() => {
+        setTimeLeft((prev) => {
+          if (prev <= 1) {
+            if (timerRef.current) {
+              clearInterval(timerRef.current);
+            }
+            // Only auto-save if we haven't already
+            if (!hasAutoSaved) {
+              handleSaveProject(true);
+            }
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+    };
+  }, [stream, hasAutoSaved]);
+
+  // Reset hasAutoSaved when starting a new session
+  useEffect(() => {
+    if (!stream) {
+      setHasAutoSaved(false);
+    }
+  }, [stream]);
 
   return (
     <div className="w-full flex flex-col gap-4">
@@ -471,7 +599,12 @@ export default function InteractiveAvatar() {
           stream ? 'h-[calc(100vh-300px)] min-h-[450px]' : 'h-[350px] justify-center'
         }`}>
           {stream ? (
-            <div className="h-full w-full justify-center items-center flex rounded-lg overflow-hidden">
+          <div className="h-full w-full justify-center items-center flex rounded-lg overflow-hidden relative">
+              <div className="absolute top-3 right-3 bg-black/50 px-3 py-1 rounded-full">
+                <span className="text-white font-mono">
+                  {formatTime(timeLeft)}
+                </span>
+              </div>
               <video
                 ref={mediaStream}
                 autoPlay
@@ -906,7 +1039,7 @@ export default function InteractiveAvatar() {
           <div className="px-6 pb-4 flex justify-end">
             <Button
               className="bg-gradient-to-r from-indigo-500 to-indigo-600 text-white shadow-md hover:shadow-lg transform transition-all duration-200 hover:scale-[1.02]"
-              onClick={handleSaveProject}
+              onClick={() => handleSaveProject(false)}
               disabled={isLoadingSession || isLoadingRepeat || isSaving}
               isLoading={isSaving}
             >

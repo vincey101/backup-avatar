@@ -11,46 +11,33 @@ import { useFormik } from "formik";
 import * as Yup from "yup";
 import { toast } from 'sonner';
 
-interface EditUserProps {
+interface AddUserProps {
     dialog: boolean;
     setDialog: (show: boolean) => void;
-    user: any;  // Current user data
-    onUpdate: () => Promise<void>;
+    loading: boolean;
+    addUser: () => Promise<void>;
 }
 
-interface FormValues {
-    name: string;
-            email: string;
-    password?: string;
-    oto_1: number;
-    oto_2: number;
-    oto_3: number;
-    oto_4: number;
-    oto_5: number;
-    oto_6: number;
-    oto_7: number;
-    oto_8: number;
-}
-
-export default function EditUser({ dialog, setDialog, user, onUpdate }: EditUserProps) {
-    const formik = useFormik<FormValues>({
+export default function AddUser({ dialog, setDialog, loading, addUser }: AddUserProps) {
+    const formik = useFormik({
         initialValues: {
-            name: user?.name || '',
-            email: user?.email || '',
-        password: '',
-            oto_1: Number(user?.oto_1 || 0),
-            oto_2: Number(user?.oto_2 || 0),
-            oto_3: Number(user?.oto_3 || 0),
-            oto_4: Number(user?.oto_4 || 0),
-            oto_5: Number(user?.oto_5 || 0),
-            oto_6: Number(user?.oto_6 || 0),
-            oto_7: Number(user?.oto_7 || 0),
-            oto_8: Number(user?.oto_8 || 0),
+            name: '',
+            email: '',
+            password: '',
+            fe: 1,
+            oto_1: 0,
+            oto_2: 0,
+            oto_3: 0,
+            oto_4: 0,
+            oto_5: 0,
+            oto_6: 0,
+            oto_7: 0,
+            oto_8: 0,
         },
         validationSchema: Yup.object({
             name: Yup.string().required("Name is required"),
             email: Yup.string().email("Invalid email").required("Email is required"),
-            password: Yup.string().min(6, "Password must be at least 6 characters"),
+            password: Yup.string().required("Password is required").min(6, "Password must be at least 6 characters"),
         }),
         onSubmit: async (values) => {
             try {
@@ -60,41 +47,33 @@ export default function EditUser({ dialog, setDialog, user, onUpdate }: EditUser
                 const userData = JSON.parse(userDataStr);
                 const token = userData.token;
 
-                // Transform the data for the backend
-                const requestBody = {
-                    name: values.name,
-                    email: values.email,
-                    ...(values.password ? { password: values.password } : {}),
-                    oto1: Number(values.oto_1),  // Remove underscore for API
-                    oto2: Number(values.oto_2),
-                    oto3: Number(values.oto_3),
-                    oto4: Number(values.oto_4),
-                    oto5: Number(values.oto_5),
-                    oto6: Number(values.oto_6),
-                    oto7: Number(values.oto_7),
-                    oto8: Number(values.oto_8)
+                const submitValues = {
+                    ...values,
+                    fe: 1
                 };
 
-                const response = await fetch(`https://api.humanaiapp.com/api/update-user/${user.id}`, {
+                const response = await fetch('https://api.humanaiapp.com/api/create-users', {
                     method: 'POST',
                     headers: {
                         'Authorization': `Bearer ${token}`,
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify(requestBody),
+                    body: JSON.stringify(submitValues),
                 });
 
                 const data = await response.json();
 
                 if (data.status === "success") {
-                    toast.success('User updated successfully!');
+                    toast.success('User added successfully!');
                     setDialog(false);
-                    await onUpdate();
+                    formik.resetForm();
+                    await addUser();
                 } else {
-                    toast.error(data.message || 'Failed to update user');
+                    toast.error(data.message || 'Failed to add user');
                 }
             } catch (error) {
-                toast.error('An error occurred while updating the user');
+                console.error('Error adding user:', error);
+                toast.error('An error occurred while adding the user');
             }
         },
     });
@@ -108,8 +87,8 @@ export default function EditUser({ dialog, setDialog, user, onUpdate }: EditUser
             <ModalContent>
                 {(onClose) => (
                     <div className="p-6">
-                        <h3 className="text-lg font-semibold mb-4">Edit User</h3>
-                    <form onSubmit={formik.handleSubmit} className="space-y-4">
+                        <h3 className="text-lg font-semibold mb-4">Add New User</h3>
+                        <form onSubmit={formik.handleSubmit} className="space-y-4">
                             <Input
                                 label="Name"
                                 name="name"
@@ -125,7 +104,7 @@ export default function EditUser({ dialog, setDialog, user, onUpdate }: EditUser
                                 errorMessage={formik.touched.email && formik.errors.email}
                             />
                             <Input
-                                label="Password (Optional)"
+                                label="Password"
                                 name="password"
                                 type="password"
                                 value={formik.values.password}
@@ -133,23 +112,14 @@ export default function EditUser({ dialog, setDialog, user, onUpdate }: EditUser
                                 errorMessage={formik.touched.password && formik.errors.password}
                             />
 
-                            <div className="space-y-3">
-                                <p className="text-sm font-medium">Access Level</p>
-                                <div>
-                                    <Checkbox
-                                        isSelected={formik.values.oto_1 === 1}
-                                        onValueChange={(checked) => {
-                                            formik.setFieldValue('oto_1', checked ? 1 : 0);
-                                        }}
-                                        classNames={{
-                                            base: "w-full",
-                                            label: "text-sm font-medium",
-                                            wrapper: "p-2"
-                                        }}
-                                    >
-                                        OTO 1
-                                    </Checkbox>
-                                </div>
+                            <div>
+                                <Checkbox
+                                    isSelected={true}
+                                    isDisabled={true}
+                                    defaultSelected
+                                >
+                                    FE
+                                </Checkbox>
                             </div>
 
                             <div className="flex justify-end gap-2 mt-6">
@@ -167,13 +137,13 @@ export default function EditUser({ dialog, setDialog, user, onUpdate }: EditUser
                                         transform transition-all duration-200 hover:scale-[1.02]"
                                     isLoading={formik.isSubmitting}
                                 >
-                                    Update User
+                                    Add User
                                 </Button>
                             </div>
-                    </form>
-                </div>
+                        </form>
+                    </div>
                 )}
             </ModalContent>
         </Modal>
     );
-}
+} 

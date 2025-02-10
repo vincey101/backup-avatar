@@ -16,11 +16,24 @@ import {
   WrenchIcon,
   Cog6ToothIcon,
   ArrowUpTrayIcon,
-  ArrowRightOnRectangleIcon
+  ArrowRightOnRectangleIcon,
+  ShieldCheckIcon
 } from '@heroicons/react/24/outline';
 import { ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/solid';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
+
+const isUserAdmin = () => {
+  try {
+    const userData = localStorage.getItem('userData');
+    if (!userData) return false;
+    
+    const { user } = JSON.parse(userData);
+    return user.role === 'admin'; // Assuming 'admin' is the role value for administrators
+  } catch (error) {
+    return false;
+  }
+};
 
 const Sidebar = () => {
   const router = useRouter();
@@ -358,6 +371,20 @@ const Sidebar = () => {
           <Cog6ToothIcon className="w-[18px] h-[18px] lg:w-[18px] lg:h-[18px] md:w-[16px] md:h-[16px] sm:w-[14px] sm:h-[14px] group-hover:text-white" />&nbsp;
           Profile Settings
         </Link>
+
+        {/* Only show Admin Panel if user is admin */}
+        {isUserAdmin() && (
+          <Link
+            href="/admin"
+            onClick={(e: React.MouseEvent<HTMLAnchorElement>) => handleNavigation('/admin', e)}
+            className={`flex items-center px-4 py-2 lg:text-[13px] md:text-[12px] sm:text-[11px] ${
+              isActive('/admin') ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+            } rounded-lg transition-colors group`}
+          >
+            <ShieldCheckIcon className="w-[18px] h-[18px] lg:w-[18px] lg:h-[18px] md:w-[16px] md:h-[16px] sm:w-[14px] sm:h-[14px] group-hover:text-white" />&nbsp;
+            Admin Panel
+          </Link>
+        )}
       </nav>
 
       {/* Logout button in a separate container at the bottom */}

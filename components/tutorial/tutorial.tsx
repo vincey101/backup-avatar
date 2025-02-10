@@ -1,20 +1,40 @@
 'use client';
 
 import { Box, Grid } from "@mui/material";
-// import VideoContainer from "../videoContainer/VideoContainer";
+import VideoContainer from "../videoContainer/VideoContainer";
 import VidContainer from "../videoContainer/VidContainer";
-// const videos = [
-//     { title: 'Video #2 - How To Configure Your API Key', url: 'CTktXxm3yeA'},
-// ];
+
+const videos = [
+    { title: 'Video #2 -  Full Walkthrough Video', url: 'vNkuaZoHfNk'},
+];
+const vide = [
+    { title: 'Video #1 - Human AI Demo', url: '496hw7ux53 '},
+];
+
+// Add the new tutorial videos
+const newTutorialVideos = [
+    { 
+        title: 'Video #3 - How To Manage Your Human AI Projects',
+        url: 'WG8bpX2mYv4'
+    },
+    { 
+        title: 'Video #4 - Human AI DFY',
+        url: 'GvIZZytrwC0'
+    },
+    { 
+        title: 'Video #5 - Human AI Agency Plan',
+        url: '4d-Cdw9Ae54'
+    }
+];
+
 const vid = [
-    { title: 'Video #1 - Video #1 - Human AI Demo', url: '496hw7ux53 '},
-    { title: 'Video #3 - Different Case Studies…', url: '7ji8s2ufqi'},
-    { title: 'Interaction with Customer Support -', url: 'h6oacysj3l'},
-    { title: 'Meeting With a Lawyer -', url: '6w2ptabwje'},
-    { title: 'Interview Session With HR  -', url: '4bqokrepvj'},
-    { title: 'Consulting with a Therapist -', url: 'pkomocpqho'},
-    { title: 'Consulting a Weight Loss Coach -', url: 'lrpyhu5d1u'},
-    ];
+    { title: 'Case Study - Consulting with a Veterinarian', url: '7ji8s2ufqi'},
+    { title: 'Case Study - Interaction with Customer Support -', url: 'h6oacysj3l'},
+    { title: 'Case Study - Meeting With a Lawyer -', url: '6w2ptabwje'},
+    { title: 'Case Study - Interview Session With HR  -', url: '4bqokrepvj'},
+    { title: 'Case Study - Consulting with a Therapist -', url: 'pkomocpqho'},
+    { title: 'Case Study - Consulting a Weight Loss Coach -', url: 'lrpyhu5d1u'},
+];
 
 export default function Tutorial() {
     return (
@@ -32,7 +52,7 @@ export default function Tutorial() {
                     <Grid item xs={12} md={8}>
                         <div className="space-y-8">
                             <p className="text-red-600 font-semibold text-lg">
-                                IMPORTANT: Pls Take Action - Ink AI Bonuses For All Members
+                                IMPORTANT: Pls Take Action - Human AI Bonuses For All Members
                             </p>
 
                             <div className="space-y-4">
@@ -55,7 +75,49 @@ export default function Tutorial() {
                             </div>
 
                             <div className="space-y-12">
+                                {/* Video #1 */}
+                                {vide.map((vides, index) => (
+                                    <div key={index} className="space-y-4">
+                                        <h2 className="text-xl font-semibold text-gray-900">
+                                            {vides.title}
+                                        </h2>
+                                        <div className="aspect-video">
+                                            <VidContainer url={vides.url} />
+                                        </div>   
+                                    </div>
+                                ))}
                                 
+                                {/* Video #2 */}
+                                {videos.map((videos, index) => (
+                                    <div key={index} className="space-y-4">
+                                        <h2 className="text-xl font-semibold text-gray-900">
+                                            {videos.title}
+                                        </h2>
+                                        <div className="aspect-video">
+                                            <VideoContainer url={videos.url} />
+                                        </div>   
+                                    </div>
+                                ))}
+
+                                {/* Videos #3, #4, #5 */}
+                                {newTutorialVideos.map((video, index) => (
+                                    <div key={index} className="space-y-4">
+                                        <h2 className="text-xl font-semibold text-gray-900">
+                                            {video.title}
+                                        </h2>
+                                        <div className="aspect-video">
+                                            <iframe
+                                                className="w-full h-full rounded-lg"
+                                                src={`https://www.youtube.com/embed/${video.url}`}
+                                                title={video.title}
+                                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                                allowFullScreen
+                                            />
+                                        </div>   
+                                    </div>
+                                ))}
+                                
+                                {/* Case Studies */}
                                 {vid.map((vids, index) => (
                                     <div key={index} className="space-y-4">
                                         <h2 className="text-xl font-semibold text-gray-900">

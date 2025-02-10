@@ -3,14 +3,16 @@
 import { useFormik, FormikErrors } from "formik";
 import * as Yup from "yup";
 import { XMarkIcon } from '@heroicons/react/24/outline';
+import { toast } from 'sonner';
+import { useState } from 'react';
 
 interface FormValues {
-    username: string;
+    username: string;  // This will be sent as 'name' to the API
     email: string;
-    firstname: string;
-    lastname: string;
     password: string;
-    oto2: string;
+    firstname: string; // For UI only
+    lastname: string;  // For UI only
+    oto2: string;     // For UI only
 }
 
 interface AddUserProps {
@@ -40,10 +42,72 @@ export default function AddUser({ dialog, setDialog, loading, addUser }: AddUser
         password: Yup.string().required("Password is Required").min(6, 'Password is too short'),
     });
 
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
     const formik = useFormik({
         initialValues,
         validationSchema,
-        onSubmit: async (values, { resetForm }) => addUser(values, resetForm)
+        onSubmit: async (values, { resetForm }) => {
+            if (isSubmitting) return;
+            setIsSubmitting(true);
+
+            try {
+                const userDataStr = localStorage.getItem('userData');
+                if (!userDataStr) {
+                    toast.error('User data not found');
+                    return;
+                }
+
+                const userData = JSON.parse(userDataStr);
+                const token = userData.token;
+
+                if (!token) {
+                    toast.error('Authentication token not found');
+                    return;
+                }
+
+                const apiData = {
+                    name: values.username,
+                    email: values.email,
+                    password: values.password
+                };
+
+                console.log('Submitting user data:', apiData); // Debug log
+
+                const response = await fetch('https://api.humanaiapp.com/api/add-agency', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(apiData),
+                });
+
+                const data = await response.json();
+                console.log('API Response:', data); // Debug log
+
+                if (data.status === "success") {
+                    // First show the success message
+                    toast.success('User added successfully!');
+                    
+                    // Then reset form and close modal
+                    resetForm();
+                    setDialog(false);
+                    
+                    // Finally refresh the list
+                    await addUser(values, resetForm);
+                    
+                    // Show another toast for list refresh
+                    toast.success('User list updated!');
+                } else {
+                    toast.error(data.message || 'Failed to add user');
+                }
+            } catch (error) {
+                toast.error('An error occurred while adding the user');
+            } finally {
+                setIsSubmitting(false);
+            }
+        }
     });
 
     if (!dialog) return null;
@@ -51,18 +115,17 @@ export default function AddUser({ dialog, setDialog, loading, addUser }: AddUser
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
             <div className="bg-white rounded-lg max-w-md w-full">
-                <div className="flex justify-end p-2">
+                <div className="flex justify-between items-center p-4 border-b">
+                    <h2 className="text-xl font-semibold text-gray-900">Add New User</h2>
                     <button
                         onClick={() => setDialog(false)}
-                        className="text-gray-400 hover:text-gray-600"
+                        className="text-gray-400 hover:text-gray-600 transition-colors"
                     >
                         <XMarkIcon className="h-6 w-6" />
                     </button>
                 </div>
                 
-                <div className="px-6 pb-6">
-                    <h2 className="text-xl font-semibold mb-6">Add New User</h2>
-                    
+                <div className="px-6 py-4">
                     <form onSubmit={formik.handleSubmit} className="space-y-4">
                         <div>
                             <input
@@ -169,14 +232,17 @@ export default function AddUser({ dialog, setDialog, loading, addUser }: AddUser
 
                         <button
                             type="submit"
-                            disabled={loading}
-                            className={`w-full py-2 px-4 rounded-md text-white font-medium ${
-                                loading 
-                                ? 'bg-gray-400 cursor-not-allowed' 
-                                : 'bg-blue-600 hover:bg-blue-700'
-                            }`}
+                            disabled={isSubmitting || loading}
+                            className={`w-full py-2 px-4 rounded-lg text-white font-medium
+                                ${isSubmitting || loading
+                                    ? 'bg-gray-400 cursor-not-allowed'
+                                    : 'bg-gradient-to-r from-indigo-500 to-gray-900 hover:from-indigo-600 hover:to-gray-800'
+                                }
+                                transform transition-all duration-200 hover:scale-[1.02]
+                                shadow-md hover:shadow-lg
+                            `}
                         >
-                            {loading ? 'Adding...' : 'Add User'}
+                            {isSubmitting ? 'Adding...' : 'Add User'}
                         </button>
                     </form>
                 </div>

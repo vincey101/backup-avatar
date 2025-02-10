@@ -3,6 +3,7 @@ import clsx from "clsx";
 import { Metadata, Viewport } from "next";
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import { Toaster } from 'sonner';
 
 import { Providers } from "./providers";
 
@@ -52,6 +53,13 @@ export default function RootLayout({
         )}
       >
         <Providers>{children}</Providers>
+        <Toaster 
+          position="top-right" 
+          richColors 
+          closeButton
+          expand={false}
+          style={{ zIndex: 9999 }}
+        />
       </body>
     </html>
   );

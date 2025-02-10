@@ -6,13 +6,30 @@ import { useEffect, useState } from 'react';
 export default function NotFound() {
   const router = useRouter();
   const [hasAuthToken, setHasAuthToken] = useState(false);
+  const [isChecking, setIsChecking] = useState(true);
 
   useEffect(() => {
+    // Check for authentication
     const authToken = document.cookie
       .split('; ')
       .find(row => row.startsWith('authToken='));
+
+    if (authToken) {
+      // If we're on the root path and authenticated, redirect to tutorial
+      if (window.location.pathname === '/') {
+        router.push('/tutorial');
+        return;
+      }
+    }
+
     setHasAuthToken(!!authToken);
-  }, []);
+    setIsChecking(false);
+  }, [router]);
+
+  // Show nothing while checking auth status
+  if (isChecking) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-900">
@@ -38,7 +55,7 @@ export default function NotFound() {
           {/* Buttons */}
           <div className="space-y-4">
             <button
-              onClick={() => router.push(hasAuthToken ? '/dashboard' : '/login')}
+              onClick={() => router.push(hasAuthToken ? '/tutorial' : '/login')}
               className="block w-full px-6 py-3 text-white bg-[#21ABCD] hover:bg-[#1C96B5] rounded-lg transition-all duration-200 hover:scale-[1.02]"
             >
               {hasAuthToken ? 'Return to Dashboard' : 'Go to Login'}

@@ -59,9 +59,24 @@ export default function SwiftProfit() {
               </p>
               <p>
                 <span className="font-semibold">Step 5 - </span>
-                Grab Your Link, Insert Into Your Marketplace Banner URL Section in 'Monetize' &
-                Also At The Footer Of Your Ebooks. Enjoy Automated Sales.
+                Grab your high ticket link,and promote
               </p>
+            </div>
+
+            {/* Add new video section */}
+            <div className="mt-8">
+                <h3 className="text-xl font-bold mb-6 text-gray-900">
+                    Watch This Video For More Details:
+                </h3>
+                <div className="aspect-video">
+                    <iframe
+                        className="w-full h-full rounded-lg"
+                        src="https://www.youtube.com/embed/u9OELDtWDP8"
+                        title="Swift Profit Tutorial"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                    />
+                </div>
             </div>
           </div>
         </div>
