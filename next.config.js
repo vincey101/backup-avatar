@@ -12,6 +12,7 @@ const nextConfig = {
     // your project has ESLint errors.
     ignoreDuringBuilds: true,
   },
+  transpilePackages: ['react-quill']
 };
 
 module.exports = nextConfig;

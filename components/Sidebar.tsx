@@ -22,6 +22,7 @@ import {
 import { ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/solid';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
+import SendOutlinedIcon from '@mui/icons-material/SendOutlined';
 
 const isUserAdmin = () => {
   try {
@@ -306,6 +307,20 @@ const Sidebar = () => {
             Swift Profit
           </Link>
           : ''}
+                
+        {isAdmin.user.oto_3 === 1 && (
+          <Link
+            href="/automation"
+            onClick={(e: React.MouseEvent<HTMLAnchorElement>) => handleNavigation('/automation', e)}
+            className={`flex items-center px-4 py-2 lg:text-[13px] md:text-[12px] sm:text-[11px] ${
+              isActive('/automation') ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+            } rounded-lg transition-colors group`}
+          >
+            <SendOutlinedIcon className="w-[18px] h-[18px] lg:w-[18px] lg:h-[18px] md:w-[16px] md:h-[16px] sm:w-[14px] sm:h-[14px] group-hover:text-white" />&nbsp;
+            Automation
+          </Link>
+        )}
+        
         {isAdmin.user.oto_8 === 1 ?
           <Link
             href="/multiple-income"
@@ -385,6 +400,8 @@ const Sidebar = () => {
             Admin Panel
           </Link>
         )}
+
+
       </nav>
 
       {/* Logout button in a separate container at the bottom */}

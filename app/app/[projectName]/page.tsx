@@ -12,6 +12,7 @@ import {
     Tooltip,
     Modal,
     ModalContent,
+    Input,
 } from "@nextui-org/react";
 import { toast } from 'sonner';
 import type { StartAvatarResponse } from "@heygen/streaming-avatar";
@@ -22,7 +23,7 @@ import StreamingAvatar, {
     TaskType,
     VoiceEmotion,
 } from "@heygen/streaming-avatar";
-import { Mic, MessageSquareText, LogOut } from 'lucide-react';
+import { Mic, MessageSquareText, LogOut, X } from 'lucide-react';
 import InteractiveAvatarTextInput from '@/components/InteractiveAvatarTextInput';
 
 interface PageProps {
@@ -50,6 +51,10 @@ export default function Preview({ params }: PageProps) {
     const [showEndSessionModal, setShowEndSessionModal] = useState(false);
     const [timeLeft, setTimeLeft] = useState<number>(0);
     const timerRef = useRef<NodeJS.Timeout | null>(null);
+    const [showSubscribeModal, setShowSubscribeModal] = useState(true);
+    const [subscriberName, setSubscriberName] = useState('');
+    const [subscriberEmail, setSubscriberEmail] = useState('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     useEffect(() => {
         const fetchProjectData = async () => {
@@ -273,6 +278,50 @@ export default function Preview({ params }: PageProps) {
         window.close();
     };
 
+    const handleSubscribe = async () => {
+        if (!subscriberName.trim() || !subscriberEmail.trim()) {
+            toast.error('Please fill in all fields');
+            return;
+        }
+
+        setIsSubmitting(true);
+        try {
+            const userDataStr = localStorage.getItem('userData');
+            if (!userDataStr) {
+                throw new Error('User data not found');
+            }
+
+            const userData = JSON.parse(userDataStr);
+            const token = userData.token;
+            const userId = userData.user.id;
+
+            const response = await fetch('https://api.humanaiapp.com/api/add-sub-user', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    user_id: userId,
+                    name: subscriberName,
+                    email: subscriberEmail
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to subscribe');
+            }
+
+            toast.success('Subscribed successfully!');
+            setShowSubscribeModal(false);
+        } catch (error) {
+            console.error('Subscription error:', error);
+            toast.error('Failed to subscribe. Please try again.');
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
     useEffect(() => {
         return () => {
             if (timerRef.current) {
@@ -439,6 +488,79 @@ export default function Preview({ params }: PageProps) {
                                 </Button>
                             </div>
                         </div>
+                    </div>
+                </ModalContent>
+            </Modal>
+
+            {/* Subscription Modal */}
+            <Modal
+                isOpen={showSubscribeModal}
+                onClose={() => setShowSubscribeModal(false)}
+                size="md"
+                isDismissable={true}
+            >
+                <ModalContent>
+                    <div className="p-6">
+                        <div className="mb-4">
+                            <h3 className="text-lg font-semibold text-gray-900">
+                                Subscribe for Updates
+                            </h3>
+                            <p className="text-sm text-gray-500 mt-1">
+                                Get automatic updates and our latest newsletter
+                            </p>
+                        </div>
+                        
+                        <fieldset className="flex flex-col gap-4">
+                            <legend className="sr-only">Subscription Form</legend>
+                            <Input
+                                label="Name"
+                                placeholder="Enter your name"
+                                value={subscriberName}
+                                onChange={(e) => setSubscriberName(e.target.value)}
+                                variant="bordered"
+                                classNames={{
+                                    input: "text-sm",
+                                    label: "text-sm"
+                                }}
+                            />
+                            
+                            <Input
+                                label="Email"
+                                placeholder="Enter your email"
+                                value={subscriberEmail}
+                                onChange={(e) => setSubscriberEmail(e.target.value)}
+                                type="email"
+                                variant="bordered"
+                                classNames={{
+                                    input: "text-sm",
+                                    label: "text-sm"
+                                }}
+                            />
+
+                            <div className="flex gap-3 mt-2">
+                                <Button
+                                    className="flex-1 border-2 border-gray-200 bg-transparent text-gray-700 hover:bg-gray-50"
+                                    onClick={() => setShowSubscribeModal(false)}
+                                >
+                                    Skip
+                                </Button>
+                                <Button
+                                    className="flex-1 text-white"
+                                    onClick={handleSubscribe}
+                                    isLoading={isSubmitting}
+                                    style={{
+                                        background: 'linear-gradient(135deg, #6366F1 0%, #111827 100%)',
+                                    }}
+                                    sx={{
+                                        '&:hover': {
+                                            opacity: 0.9,
+                                        },
+                                    }}
+                                >
+                                    Subscribe
+                                </Button>
+                            </div>
+                        </fieldset>
                     </div>
                 </ModalContent>
             </Modal>
