@@ -408,11 +408,10 @@ const Sidebar = () => {
       <div className="p-3 lg:p-3 md:p-2 sm:p-2 border-t border-gray-700">
         <button
           onClick={handleLogout}
-          className={`flex items-center w-full px-4 py-2 lg:text-[13px] md:text-[12px] sm:text-[11px] ${isActive('/login') ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white'
-            } rounded-lg transition-colors group`}
+          className={`flex items-center w-full px-4 py-2 lg:text-[13px] md:text-[12px] sm:text-[11px] text-red-500 hover:bg-gray-800 hover:text-red-400 rounded-lg transition-colors group`}
         >
-          <ArrowRightOnRectangleIcon className="w-[18px] h-[18px] lg:w-[18px] lg:h-[18px] md:w-[16px] md:h-[16px] sm:w-[14px] sm:h-[14px] group-hover:text-white" />
-          Logout
+          <ArrowRightOnRectangleIcon className="w-[18px] h-[18px] lg:w-[18px] lg:h-[18px] md:w-[16px] md:h-[16px] sm:w-[14px] sm:h-[14px] text-red-500 group-hover:text-red-400" />
+          <span className="ml-2">Logout</span>
         </button>
       </div>
     </div>

@@ -43,6 +43,8 @@ export default function Admin() {
     const [deleteUserId, setDeleteUserId] = useState<number | null>(null);
     const [editingUser, setEditingUser] = useState<AdminUser | null>(null);
     const [showEditModal, setShowEditModal] = useState(false);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [usersPerPage] = useState(10);
 
     const fetchUsers = useCallback(async () => {
         try {
@@ -165,6 +167,101 @@ export default function Admin() {
         setDeleteUserId(null);
     };
 
+    // Calculate pagination values
+    const indexOfLastUser = currentPage * usersPerPage;
+    const indexOfFirstUser = indexOfLastUser - usersPerPage;
+    const currentUsers = filteredUsers.slice(indexOfFirstUser, indexOfLastUser);
+    const totalPages = Math.ceil(filteredUsers.length / usersPerPage);
+
+    // Handle page changes
+    const handlePageChange = (pageNumber: number) => {
+        setCurrentPage(pageNumber);
+    };
+
+    // Pagination component
+    const Pagination = () => {
+        // Logic to show limited page numbers with ellipsis
+        const getPageNumbers = () => {
+            const pageNumbers = [];
+            if (totalPages <= 7) {
+                // If 7 or fewer pages, show all
+                for (let i = 1; i <= totalPages; i++) {
+                    pageNumbers.push(i);
+                }
+            } else {
+                // Always show first page
+                pageNumbers.push(1);
+                
+                if (currentPage > 3) {
+                    pageNumbers.push('...');
+                }
+                
+                // Show pages around current page
+                for (let i = Math.max(2, currentPage - 1); i <= Math.min(currentPage + 1, totalPages - 1); i++) {
+                    pageNumbers.push(i);
+                }
+                
+                if (currentPage < totalPages - 2) {
+                    pageNumbers.push('...');
+                }
+                
+                // Always show last page
+                pageNumbers.push(totalPages);
+            }
+            return pageNumbers;
+        };
+
+        return (
+            <div className="flex items-center justify-center gap-2 px-4 py-3 bg-white border-t border-gray-200">
+                <button
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage === 1}
+                    className={`relative inline-flex items-center px-3 py-2 text-sm font-medium rounded-md
+                        ${currentPage === 1 
+                            ? 'text-gray-400 bg-gray-100 cursor-not-allowed' 
+                            : 'text-gray-700 bg-white hover:bg-gray-50 border'}`}
+                >
+                    Previous
+                </button>
+
+                <div className="flex gap-1">
+                    {getPageNumbers().map((pageNum, index) => (
+                        pageNum === '...' ? (
+                            <span
+                                key={`ellipsis-${index}`}
+                                className="px-3 py-2 text-gray-500"
+                            >
+                                ...
+                            </span>
+                        ) : (
+                            <button
+                                key={pageNum}
+                                onClick={() => handlePageChange(Number(pageNum))}
+                                className={`px-3 py-2 text-sm font-medium rounded-md
+                                    ${currentPage === pageNum
+                                        ? 'bg-indigo-500 text-white'
+                                        : 'text-gray-700 bg-white hover:bg-gray-50 border'}`}
+                            >
+                                {pageNum}
+                            </button>
+                        )
+                    ))}
+                </div>
+
+                <button
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                    className={`relative inline-flex items-center px-3 py-2 text-sm font-medium rounded-md
+                        ${currentPage === totalPages 
+                            ? 'text-gray-400 bg-gray-100 cursor-not-allowed' 
+                            : 'text-gray-700 bg-white hover:bg-gray-50 border'}`}
+                >
+                    Next
+                </button>
+            </div>
+        );
+    };
+
     if (isLoading) {
         return (
             <div className="p-8 flex justify-center">
@@ -236,14 +333,14 @@ export default function Admin() {
                                 </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-gray-200">
-                                {filteredUsers.length === 0 ? (
+                                {currentUsers.length === 0 ? (
                                     <tr>
                                         <td colSpan={5} className="px-4 py-4 text-center text-gray-500">
                                             {searchQuery ? 'No users found matching your search' : 'No users found'}
                                         </td>
                                     </tr>
                                 ) : (
-                                    filteredUsers.map((user) => (
+                                    currentUsers.map((user) => (
                                         <tr key={user.id} className="hover:bg-gray-50">
                                             <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 overflow-hidden text-ellipsis">
                                                 {user.name}
@@ -284,6 +381,9 @@ export default function Admin() {
                     </div>
                 </div>
             </div>
+
+            {/* Add Pagination component after the table */}
+            {filteredUsers.length > 0 && <Pagination />}
 
             {/* Modals */}
             <AddUser 
