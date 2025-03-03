@@ -52,7 +52,7 @@ interface SaveProjectPayload {
   template: string;
   knowledge_base: string;
   language: string;
-//   voice: string;
+  //   voice: string;
   emotion: string;
   quality: string;
   video_encoding: string;
@@ -83,42 +83,60 @@ export default function InteractiveAvatar() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [processingStatus, setProcessingStatus] = useState<string>('');
 
-//   const [projectDetails, setProjectDetails] = useState(() => {
-//     const savedProject = localStorage.getItem('avatarProject');
-//     return savedProject ? JSON.parse(savedProject) : {
-//       projectName: '',
-//       niche: '',
-//     };
-//   });
+  //   const [projectDetails, setProjectDetails] = useState(() => {
+  //     const savedProject = localStorage.getItem('avatarProject');
+  //     return savedProject ? JSON.parse(savedProject) : {
+  //       projectName: '',
+  //       niche: '',
+  //     };
+  //   });
 
-const [projectDetails, setProjectDetails] = useState<{ projectName: string; niche: string }>({
-  projectName: '',
-  niche: '',
-});
+  const [projectDetails, setProjectDetails] = useState<{ projectName: string; niche: string }>({
+    projectName: '',
+    niche: '',
+  });
 
-useEffect(() => {
-  if (typeof window !== "undefined") { // ✅ Ensure this runs only in the browser
-    const savedProject = localStorage.getItem('avatarProject');
-    if (savedProject) {
-      setProjectDetails(JSON.parse(savedProject));
+  useEffect(() => {
+    if (typeof window !== "undefined") { // ✅ Ensure this runs only in the browser
+      const savedProject = localStorage.getItem('avatarProject');
+      if (savedProject) {
+        setProjectDetails(JSON.parse(savedProject));
+      }
     }
-  }
-}, []);
+  }, []);
 
-const [hasValidToken, setHasValidToken] = useState(false);
+  const [hasValidToken, setHasValidToken] = useState(false);
 
-useEffect(() => {
-  if (typeof window !== "undefined") { // ✅ Ensure localStorage runs in the browser
+  useEffect(() => {
+    if (typeof window !== "undefined") { // ✅ Ensure localStorage runs in the browser
+      const userDataStr = localStorage.getItem('userData');
+      if (userDataStr) {
+        const userData = JSON.parse(userDataStr);
+        setHasValidToken(!!userData.token);
+      } else {
+        setHasValidToken(false);
+      }
+    }
+  }, []);
+
+  const [timeLeft, setTimeLeft] = useState<number>(0);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const getSessionDuration = () => {
     const userDataStr = localStorage.getItem('userData');
-    if (userDataStr) {
-      const userData = JSON.parse(userDataStr);
-      setHasValidToken(!!userData.token);
-    } else {
-      setHasValidToken(false);
-    }
-  }
-}, []);
+    if (!userDataStr) return 0;
 
+    const userData = JSON.parse(userDataStr);
+    if (userData.user.oto_1 === 1) return 5 * 60; // 5 minutes in seconds
+    if (userData.user.fe === 1) return 2 * 60; // 2 minutes in seconds
+    return 2 * 60; // Default to 2 minutes
+  };
+
+  const formatTime = (seconds: number): string => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
 
   const EMOTION_OPTIONS: EmotionOption[] = [
     { key: '', label: 'Select Emotion' },
@@ -133,15 +151,15 @@ useEffect(() => {
   //const [hasValidToken, setHasValidToken] = useState(false);
 
   // Update the token check to use localStorage
-//   useEffect(() => {
-//     const userDataStr = localStorage.getItem('userData');
-//     if (userDataStr) {
-//         const userData = JSON.parse(userDataStr);
-//         setHasValidToken(!!userData.token);
-//     } else {
-//         setHasValidToken(false);
-//     }
-//   }, []);
+  //   useEffect(() => {
+  //     const userDataStr = localStorage.getItem('userData');
+  //     if (userDataStr) {
+  //         const userData = JSON.parse(userDataStr);
+  //         setHasValidToken(!!userData.token);
+  //     } else {
+  //         setHasValidToken(false);
+  //     }
+  //   }, []);
 
   useEffect(() => {
     const selectedAvatarId = localStorage.getItem('selectedAvatarId');
@@ -167,34 +185,14 @@ useEffect(() => {
 
     return "";
   }
-  
-  const [timeLeft, setTimeLeft] = useState<number>(0);
 
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
-
-
-
-  const getSessionDuration = () => {
-    const userDataStr = localStorage.getItem('userData');
-
-    if (!userDataStr) return 0;
-
-    const userData = JSON.parse(userDataStr);
-
-    if (userData.user.oto_1 === 1) return 5 * 60; // 5 minutes in seconds
-
-    if (userData.user.fe === 1) return 2 * 60; // 2 minutes in seconds
-
-    return 2 * 60; // Default to 2 minutes
-
-  };
-
-  const formatTime = (seconds: number): string => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-
-  };
+  useEffect(() => {
+    const selectedAvatarId = localStorage.getItem('selectedAvatarId');
+    if (selectedAvatarId) {
+      setAvatarId(selectedAvatarId);
+      localStorage.removeItem('selectedAvatarId');
+    }
+  }, []);
 
   async function startSession() {
     setIsLoadingSession(true);
@@ -240,43 +238,32 @@ useEffect(() => {
         quality: AvatarQuality.High,
         avatarName: avatarId,
         knowledgeBase: knowledgeBase,
-        // knowledgeBase: "https://www.appclick.ng/about.php", // Or use a custom `knowledgeBase`.
-        // knowledgeId: knowledgeId, // Or use a custom `knowledgeBase`.
         voice: {
-        //   voice_id: "26b2064088674c80b1e5fc5ab1a068eb",
-          rate: 1.5, // 0.5 ~ 1.5
+          rate: 1.5,
           emotion: emotion,
-          // elevenlabsSettings: {
-          //   stability: 1,
-          //   similarity_boost: 1,
-          //   style: 1,
-          //   use_speaker_boost: false,
-          // },
         },
         video_encoding: {
-          codec: "h264", // Video codec (h264 or vp8)
+          codec: "h264",
         },
         language: language,
         disableIdleTimeout: true,
       } as any);
 
       setData(res);
-      // default to voice mode
       await avatar.current?.startVoiceChat({
         useSilencePrompt: false
       });
       setChatMode("voice_mode");
-      // Start the timer after successful session start
 
       const duration = getSessionDuration();
       setTimeLeft(duration);
       timerRef.current = setInterval(() => {
         setTimeLeft((prev) => {
           if (prev <= 1) {
-            // Clear interval and end session when time is up
-            if (timerRef.current) clearInterval(timerRef.current);
-            // Save project before ending session
-            handleSaveProject().then(() => {
+            if (timerRef.current) {
+              clearInterval(timerRef.current);
+            }
+            handleTimerSave().then(() => {
               endSession();
             });
             return 0;
@@ -284,6 +271,7 @@ useEffect(() => {
           return prev - 1;
         });
       }, 1000);
+
     } catch (error) {
       console.error("Error starting avatar session:", error);
       setLoadingMessage("Something went wrong. Please try again.");
@@ -311,12 +299,12 @@ useEffect(() => {
       });
   }
   async function endSession() {
-        if (timerRef.current) {
+    if (timerRef.current) {
       clearInterval(timerRef.current);
     }
     await avatar.current?.stopAvatar();
     setStream(undefined);
-        setTimeLeft(0);
+    setTimeLeft(0);
   }
 
   const handleChangeChatMode = useMemoizedFn(async (v) => {
@@ -342,7 +330,7 @@ useEffect(() => {
 
   useEffect(() => {
     return () => {
-         if (timerRef.current) {
+      if (timerRef.current) {
         clearInterval(timerRef.current);
       }
     };
@@ -523,63 +511,62 @@ useEffect(() => {
 
       if (response.ok) {
         if (!isAutoSave) {
-          // For manual save
-          if (timerRef.current) {
-            clearInterval(timerRef.current);
-          }
+          // Manual save - keep existing success behavior
           await endSession();
           toast.success('Project saved successfully!');
           router.push('/projects/manage');
         } else {
-          // For auto-save: just end session quietly
+          // Auto-save via timer - show info toast
           setHasAutoSaved(true);
           await endSession();
+          toast.info('Session ended. Check the Manage Projects section to view your saved project. If the project name already exists, please create a new project with a unique name.');
         }
       } else {
-        toast.error(data.message || 'Failed to save project');
+        if (!isAutoSave) {
+          // Only show error toast for manual saves
+          toast.error(data.message || 'Failed to save project');
+        }
       }
     } catch (error) {
-      toast.error('An error occurred while saving the project');
+      if (!isAutoSave) {
+        // Only show error toast for manual saves
+        toast.error('An error occurred while saving the project');
+      }
       console.error('Save project error:', error);
     } finally {
       setIsSaving(false);
     }
   };
 
-  // Update the timer logic
-  useEffect(() => {
-    if (stream && !timerRef.current && !hasAutoSaved) {
-      const duration = getSessionDuration();
-      setTimeLeft(duration);
-      timerRef.current = setInterval(() => {
-        setTimeLeft((prev) => {
-          if (prev <= 1) {
-            if (timerRef.current) {
-              clearInterval(timerRef.current);
-            }
-            // Only auto-save if we haven't already
-            if (!hasAutoSaved) {
-              handleSaveProject(true);
-            }
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    }
-    return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-      }
-    };
-  }, [stream, hasAutoSaved]);
+  // Add this new function for timer-based saves
+  const handleTimerSave = async () => {
+    try {
+      const payload: SaveProjectPayload = {
+        project_name: projectDetails.projectName,
+        niche: projectDetails.niche,
+        template: avatarId,
+        knowledge_base: knowledgeBase,
+        language: language,
+        emotion: emotion,
+        quality: "high",
+        video_encoding: "h264"
+      };
 
-  // Reset hasAutoSaved when starting a new session
-  useEffect(() => {
-    if (!stream) {
-      setHasAutoSaved(false);
+      await fetch('https://api.humanaiapp.com/api/save-avatar-project', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${document.cookie.replace(/(?:(?:^|.*;\s*)authToken\s*\=\s*([^;]*).*$)|^.*$/, "$1")}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      // Always show info toast for timer saves, regardless of response
+      toast.info('Session ended. Check Manage Projects section for your project. Use unique project name if not found.');
+    } catch (error) {
+      console.error('Timer save error:', error);
     }
-  }, [stream]);
+  };
 
   return (
     <div className="w-full flex flex-col gap-4">
@@ -592,14 +579,12 @@ useEffect(() => {
         </div>
       )}
 
-      <Card className={`bg-white border border-gray-200 ${
-        stream ? 'w-[95%] max-w-[1800px] min-w-[1200px] mx-auto fixed top-4 left-1/2 -translate-x-1/2 z-50' : ''
-      }`}>
-        <CardBody className={`flex flex-col items-center bg-white ${
-          stream ? 'h-[calc(100vh-300px)] min-h-[450px]' : 'h-[350px] justify-center'
+      <Card className={`bg-white border border-gray-200 ${stream ? 'w-[95%] max-w-[1800px] min-w-[1200px] mx-auto fixed top-4 left-1/2 -translate-x-1/2 z-50' : ''
         }`}>
+        <CardBody className={`flex flex-col items-center bg-white ${stream ? 'h-[calc(100vh-300px)] min-h-[450px]' : 'h-[350px] justify-center'
+          }`}>
           {stream ? (
-          <div className="h-full w-full justify-center items-center flex rounded-lg overflow-hidden relative">
+            <div className="h-full w-full justify-center items-center flex rounded-lg overflow-hidden relative">
               <div className="absolute top-3 right-3 bg-black/50 px-3 py-1 rounded-full">
                 <span className="text-white font-mono">
                   {formatTime(timeLeft)}
@@ -636,19 +621,21 @@ useEffect(() => {
             </div>
           ) : !isLoadingSession ? (
             <div className="h-full justify-center items-center flex flex-col gap-2 w-[500px] self-center relative">
-              <Button
-                isIconOnly
-                className="absolute -left-40 -top-2 bg-gradient-to-br from-[#6366F1] to-[#111827] hover:from-[#5457DC] hover:to-[#1f2937] w-[45px] h-[45px] shadow-md hover:shadow-lg"
-                onClick={() => router.back()}
-              >
-                <ArrowLeft className="text-white" size={24} />
-              </Button>
-              <div className="flex flex-col gap-1 w-full px-2">
+              <div className="flex items-center w-full mb-2">
+                <Button
+                  isIconOnly
+                  className="bg-gradient-to-br from-[#6366F1] to-[#111827] hover:from-[#5457DC] hover:to-[#1f2937] w-[45px] h-[45px] shadow-md hover:shadow-lg"
+                  onClick={() => router.back()}
+                >
+                  <ArrowLeft className="text-white" size={24} />
+                </Button>
                 {!selectedKnowledgeType && (
-                  <p className="text-base font-medium text-gray-600 text-center mb-2">
+                  <p className="text-base font-medium text-gray-600 text-center flex-1">
                     Setup Your Custom Knowledge Base
                   </p>
                 )}
+              </div>
+              <div className="flex flex-col gap-1 w-full px-2">
                 <div className="grid grid-cols-4 gap-2">
                   <Tooltip
                     content="Enter URL"
@@ -659,8 +646,8 @@ useEffect(() => {
                   >
                     <Button
                       className={`flex items-center justify-center p-4 h-14 transition-all duration-300 ${selectedKnowledgeType === 'url'
-                          ? 'bg-gradient-to-tr from-purple-600 to-pink-500 text-white shadow-lg scale-105'
-                          : 'bg-gradient-to-tr from-white to-purple-50 hover:from-purple-50 hover:to-purple-100 border border-purple-100 shadow-sm hover:shadow-md hover:scale-105'
+                        ? 'bg-gradient-to-tr from-purple-600 to-pink-500 text-white shadow-lg scale-105'
+                        : 'bg-gradient-to-tr from-white to-purple-50 hover:from-purple-50 hover:to-purple-100 border border-purple-100 shadow-sm hover:shadow-md hover:scale-105'
                         }`}
                       onClick={() => {
                         setSelectedKnowledgeType('url');
@@ -686,8 +673,8 @@ useEffect(() => {
                   >
                     <Button
                       className={`flex items-center justify-center p-4 h-14 transition-all duration-300 ${selectedKnowledgeType === 'text'
-                          ? 'bg-gradient-to-tr from-purple-600 to-pink-500 text-white shadow-lg scale-105'
-                          : 'bg-gradient-to-tr from-white to-rose-50 hover:from-rose-50 hover:to-rose-100 border border-purple-100 shadow-sm hover:shadow-md hover:scale-105'
+                        ? 'bg-gradient-to-tr from-purple-600 to-pink-500 text-white shadow-lg scale-105'
+                        : 'bg-gradient-to-tr from-white to-rose-50 hover:from-rose-50 hover:to-rose-100 border border-purple-100 shadow-sm hover:shadow-md hover:scale-105'
                         }`}
                       onClick={() => {
                         setSelectedKnowledgeType('text');

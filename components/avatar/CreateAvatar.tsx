@@ -174,6 +174,7 @@ const CreateAvatar = () => {
                                         onChange={handleChange}
                                         error={errors.projectName}
                                         helperText={errors.projectName ? "Project name is required" : ""}
+                                        placeholder="Use a unique name (e.g., myproject546)"
                                         size="small"
                                         sx={{
                                             '& .MuiOutlinedInput-root': {
@@ -182,6 +183,11 @@ const CreateAvatar = () => {
                                                     borderColor: '#6366F1',
                                                 },
                                             },
+                                            '& .MuiInputBase-input::placeholder': {
+                                                fontSize: '0.75rem',
+                                                opacity: 0.7,
+                                                fontStyle: 'italic'
+                                            }
                                         }}
                                     />
                                 </FormControl>
@@ -233,6 +239,11 @@ const CreateAvatar = () => {
                                                     borderColor: '#6366F1',
                                                 },
                                             },
+                                            '& .MuiInputBase-input::placeholder': {
+                                                fontSize: '0.75rem',
+                                                opacity: 0.7,
+                                                fontStyle: 'italic'
+                                            }
                                         }}
                                     />
                                 </FormControl>

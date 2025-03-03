@@ -12,7 +12,7 @@ interface FormValues {
     password: string;
     firstname: string; // For UI only
     lastname: string;  // For UI only
-    oto2: string;     // For UI only
+    oto1: string;     // Changed from oto2 to oto1 to match the naming
 }
 
 interface AddUserProps {
@@ -29,7 +29,7 @@ export default function AddUser({ dialog, setDialog, loading, addUser }: AddUser
         firstname: "",
         lastname: "",
         password: '',
-        oto2: '0'
+        oto1: '0'     // Changed from oto2 to oto1
     };
 
     const validationSchema = Yup.object({
@@ -69,7 +69,8 @@ export default function AddUser({ dialog, setDialog, loading, addUser }: AddUser
                 const apiData = {
                     name: values.username,
                     email: values.email,
-                    password: values.password
+                    password: values.password,
+                    oto1: values.oto1    // Add oto1 to API data
                 };
 
                 console.log('Submitting user data:', apiData); // Debug log
@@ -219,9 +220,9 @@ export default function AddUser({ dialog, setDialog, loading, addUser }: AddUser
                                 <label className="flex items-center space-x-2">
                                     <input
                                         type="checkbox"
-                                        checked={formik.values.oto2 === '1'}
+                                        checked={formik.values.oto1 === '1'}
                                         onChange={(e) => {
-                                            formik.setFieldValue('oto2', e.target.checked ? '1' : '0')
+                                            formik.setFieldValue('oto1', e.target.checked ? '1' : '0')
                                         }}
                                         className="form-checkbox text-blue-600"
                                     />

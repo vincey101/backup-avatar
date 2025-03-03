@@ -72,10 +72,21 @@ export default function Preview({ params }: PageProps) {
                     throw new Error('Failed to fetch project data');
                 }
 
-                const { data: projectData } = await response.json();
+                // Clone the response before reading it
+                const responseData = await response.clone().json();
+                const { data: projectData } = responseData;
 
                 if (!projectData) {
                     throw new Error('Project not found');
+                }
+
+                // Store the user_id from the response in localStorage
+                if (projectData.user_id) {
+                    try {
+                        localStorage.setItem('preview_user_id', projectData.user_id.toString());
+                    } catch (error) {
+                        console.error('Error storing user ID:', error);
+                    }
                 }
 
                 setProject(projectData);
@@ -117,10 +128,29 @@ export default function Preview({ params }: PageProps) {
 
     const initializePreview = async (projectData: any) => {
         try {
-            const response = await fetch("/api/get-access-token", {
-                method: "POST",
-            });
-            const token = await response.text();
+            const getAccessToken = async (retries = 3) => {
+                for (let i = 0; i < retries; i++) {
+                    try {
+                        const response = await fetch("/api/get-access-token", {
+                            method: "POST",
+                            signal: AbortSignal.timeout(30000), // 30 second timeout
+                        });
+                        
+                        if (!response.ok) {
+                            throw new Error("Failed to get access token");
+                        }
+                        
+                        // Clone the response before reading it
+                        const token = await response.clone().text();
+                        return token;
+                    } catch (error) {
+                        if (i === retries - 1) throw error;
+                        await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1))); // Exponential backoff
+                    }
+                }
+            };
+
+            const token = await getAccessToken();
 
             if (!token) {
                 throw new Error("Failed to get access token");
@@ -286,19 +316,25 @@ export default function Preview({ params }: PageProps) {
 
         setIsSubmitting(true);
         try {
+            let userId;
+            
+            // First try to get user ID from userData in localStorage
             const userDataStr = localStorage.getItem('userData');
-            if (!userDataStr) {
-                throw new Error('User data not found');
+            if (userDataStr) {
+                const userData = JSON.parse(userDataStr);
+                userId = userData.user.id;
+            } else {
+                // If userData doesn't exist, try to get from preview_user_id
+                const previewUserId = localStorage.getItem('preview_user_id');
+                if (!previewUserId) {
+                    throw new Error('User ID not found');
+                }
+                userId = previewUserId;
             }
-
-            const userData = JSON.parse(userDataStr);
-            const token = userData.token;
-            const userId = userData.user.id;
 
             const response = await fetch('https://api.humanaiapp.com/api/add-sub-user', {
                 method: 'POST',
                 headers: {
-                    'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
