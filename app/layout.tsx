@@ -1,14 +1,11 @@
 import "@/styles/globals.css";
 import clsx from "clsx";
 import { Metadata, Viewport } from "next";
-import { ToastContainer } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
 import { Toaster } from 'sonner';
-
 import { Providers } from "./providers";
+import SessionManager from '@/components/SessionManager';
 
 import { Fira_Code as FontMono, Inter as FontSans } from "next/font/google";
-import Sidebar from "@/components/Sidebar";
 
 const fontSans = FontSans({
   subsets: ["latin"],
@@ -52,6 +49,7 @@ export default function RootLayout({
           fontMono.variable
         )}
       >
+        <SessionManager />
         <Providers>{children}</Providers>
         <Toaster 
           position="top-right" 

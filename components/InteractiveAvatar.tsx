@@ -620,8 +620,8 @@ export default function InteractiveAvatar() {
               </div>
             </div>
           ) : !isLoadingSession ? (
-            <div className="h-full justify-center items-center flex flex-col gap-2 w-[500px] self-center relative">
-              <div className="flex items-center w-full mb-2">
+            <div className="h-full justify-center items-center flex flex-col gap-2 w-[500px] self-center">
+              <div className="w-full flex items-center mb-2">
                 <Button
                   isIconOnly
                   className="bg-gradient-to-br from-[#6366F1] to-[#111827] hover:from-[#5457DC] hover:to-[#1f2937] w-[45px] h-[45px] shadow-md hover:shadow-lg"
@@ -635,7 +635,7 @@ export default function InteractiveAvatar() {
                   </p>
                 )}
               </div>
-              <div className="flex flex-col gap-1 w-full px-2">
+              <div className="flex flex-col gap-1 w-full px-2 overflow-y-auto max-h-[calc(100%-120px)]">
                 <div className="grid grid-cols-4 gap-2">
                   <Tooltip
                     content="Enter URL"
@@ -908,15 +908,17 @@ export default function InteractiveAvatar() {
                   </Select>
                 </div>
               </div>
-              <Button
-                className="bg-gradient-to-tr from-indigo-500 to-indigo-300 w-full text-white mt-1"
-                size="sm"
-                variant="shadow"
-                onClick={startSession}
-                isDisabled={!knowledgeBase.trim()}
-              >
-                Start session
-              </Button>
+              <div className="w-full px-2 mt-2">
+                <Button
+                  className="bg-gradient-to-tr from-indigo-500 to-indigo-300 w-full text-white"
+                  size="sm"
+                  variant="shadow"
+                  onClick={startSession}
+                  isDisabled={!knowledgeBase.trim()}
+                >
+                  Start session
+                </Button>
+              </div>
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center space-y-4">

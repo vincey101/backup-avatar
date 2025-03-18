@@ -186,16 +186,29 @@ export default function ManageProjects() {
   };
 
   const handleCopyEmbed = (project: Project) => {
-    // Create the iframe HTML with dynamic project name
-    const iframeCode = `<iframe 
-    src="https://humanaiapp.com/app/${encodeURIComponent(project.project_name)}?hideNotifications=true&disablePreview=true" 
-    width="500" 
-    height="400" 
-    style="transform: scale(0.8); transform-origin: 0 0; border: 1px solid #ddd;"
-    allow="microphone; camera; display-capture; fullscreen; notifications"
-    sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-downloads allow-modals"
-    referrerpolicy="no-referrer"
-></iframe>`;
+    // Create the iframe HTML with dynamic project name and timeout script
+    const iframeCode = `
+<!-- AI Human Embed Code -->
+<div id="ai-human-container">
+    <iframe 
+        src="https://humanaiapp.com/app/${encodeURIComponent(project.project_name)}?hideNotifications=true&disablePreview=true" 
+        width="500" 
+        height="400" 
+        style="transform: scale(0.8); transform-origin: 0 0; border: 1px solid #ddd;"
+        allow="microphone; camera; display-capture; fullscreen; notifications"
+        sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-downloads allow-modals"
+        referrerpolicy="no-referrer"
+    ></iframe>
+</div>
+<script>
+    // Auto-close iframe after 8 minutes
+    setTimeout(() => {
+        const container = document.getElementById('ai-human-container');
+        if (container) {
+            container.innerHTML = '<div style="padding: 20px; text-align: center; background: #f5f5f5; border: 1px solid #ddd;">Session expired. Please refresh to start a new session.</div>';
+        }
+    }, 8 * 60 * 1000);
+</script>`;
 
     // Copy to clipboard
     navigator.clipboard.writeText(iframeCode).then(() => {

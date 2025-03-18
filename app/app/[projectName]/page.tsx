@@ -196,12 +196,18 @@ export default function Preview({ params }: PageProps) {
                 setTimeLeft((prev) => {
                     if (prev <= 1) {
                         if (timerRef.current) clearInterval(timerRef.current);
+                        // Force close the window after timeout
                         window.close();
                         return 0;
                     }
                     return prev - 1;
                 });
             }, 1000);
+
+            // Force close after exactly 8 minutes
+            const closeTimeout = setTimeout(() => {
+                window.close();
+            }, 8 * 60 * 1000);
 
             await avatar.current.startVoiceChat({
                 useSilencePrompt: false
@@ -359,10 +365,29 @@ export default function Preview({ params }: PageProps) {
     };
 
     useEffect(() => {
+        const duration = getSessionDuration();
+        setTimeLeft(duration);
+
+        timerRef.current = setInterval(() => {
+            setTimeLeft((prev) => {
+                if (prev <= 1) {
+                    if (timerRef.current) clearInterval(timerRef.current);
+                    // Force close the window after timeout
+                    window.close();
+                    return 0;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+
+        // Force close after exactly 8 minutes
+        const closeTimeout = setTimeout(() => {
+            window.close();
+        }, 8 * 60 * 1000);
+
         return () => {
-            if (timerRef.current) {
-                clearInterval(timerRef.current);
-            }
+            if (timerRef.current) clearInterval(timerRef.current);
+            clearTimeout(closeTimeout);
         };
     }, []);
 

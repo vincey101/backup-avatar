@@ -11,6 +11,9 @@ export function middleware(request: NextRequest) {
   // Get token from cookie - Change from 'token' to 'authToken'
   const authToken = request.cookies.get('authToken')?.value;
 
+  // Define public paths that don't require authentication
+  const publicPaths = ['/login', '/register'];
+  
   // If it's the root path, check authentication
   if (path === '/') {
     if (authToken) {
@@ -24,11 +27,9 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Define public paths that don't require authentication
-  const publicPaths = ['/login', '/register'];
-  
   // If user is not authenticated and trying to access a protected route
   if (!authToken && !publicPaths.includes(path)) {
+    // Always redirect to login page
     return NextResponse.redirect(new URL('/login', request.url));
   }
 
